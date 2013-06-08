@@ -17,6 +17,8 @@
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+from apscheduler.scheduler import Scheduler
+
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 
@@ -32,6 +34,12 @@ DEBUG = True
 # database configuration
 SQLALCHEMY_DATABASE_URI = 'sqlite:///db.sqlite'
 
+# own certificate, empty if there isn't any
+SSL_CERT_STRING = ''
+
+# queues root url
+ROOT_URL = 'http://localhost:5000/api/queues/'
+
 # import custom settings if any
 try:
     from custom_settings import *
@@ -39,15 +47,20 @@ except:
     pass
 
 # boostrap our little application
+app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
 app.config.from_object(__name__)
 db = SQLAlchemy(app)
 import models
 
-from api import api as api_v1
-app.register_blueprint(api_v1, url_prefix='/api/v1')
+from api import api
+from user_api import *
+app.register_blueprint(api, url_prefix='/api')
+app.register_blueprint(user_api, url_prefix='/user')
 
-from tasks_protocol import *
+from protocol import *
+
+scheduler = Scheduler()
 
 if __name__ == "__main__":
-    # TODO: use sched to schedule and handle events
-    app.run(threaded=True)
+    scheduler.start()
+    app.run(threaded=True, port=app.config.get('SERVER_PORT', None))

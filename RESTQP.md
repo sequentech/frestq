@@ -28,6 +28,7 @@ later or discard the message, both are valid options.
 The input format of the messages is always on the following form and in UTF-8:
 
 {
+    "message_id": "<unique id of the message. required field>",
     "action": "<action text of the message. required field>",
     "sender_url": "<URL where the receiver can send messages to. required field>",
     "data": <put anything you want here, in json format. optional field>,
@@ -35,10 +36,14 @@ The input format of the messages is always on the following form and in UTF-8:
     "pingback_date": "<date in ISO-8601, optional field>",
     "expiration_date": "<date in ISO-8601, optional field>",
     "info": "<information text, optional field>",
-    "task_id": <optional id>
+    "task_id": <id, required field>
 }
 
 Detailed fields description:
+
+* message_id
+
+ Text field of up to 1024 characters. This is a required field.
 
 * action
 
@@ -85,26 +90,21 @@ Detailed fields description:
  interpret this text. Used usually as an user readable string for logging
  purpuses.
 
+
 * task_id
 
  Optional, format would be user-defined.
+
+
+
+The response of the receiver can vary depending on each case, indicated by the
+HTTP status code returned:
 
 The response of the receiver can vary depending on each case, indicated by the
 HTTP status code returned:
 
 * STATUS 200
- Message correctly received and processed. This what you typically want. Answer
- is in the format:
-
- {
-    "id": "<message_id>",
-    "data": <output data>,
-    "async_data": <output data, optional>,
-    "task_id": <optional id, optional>
- }
-
- Task id is optional and only used as a possible extension point of the
- protocol, which is used in frestq for convenience.
+ Message correctly received and processed.
 
 * STATUS 503
  Indicates that the queue is full or the service is overloaded. Response will be

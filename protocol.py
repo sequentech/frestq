@@ -22,6 +22,28 @@ import json
 from action_handlers import ActionHandlers
 import decorators
 
-@decorators.message_action(action="frestq.hello", queue="frestq")
-def hello(msg):
-    msg.output_data = dict(info="hello world!")
+@decorators.message_action(action="frestq.update_task", queue="frestq")
+def update_task(msg):
+    from app import db
+
+    task = msg.task
+    if task.status == "finished":
+        # error, cannot update an already finished task!
+        # TODO: send back an error update
+        return
+
+    keys = ['output_data', 'status', 'output_async_data']
+    if msg.data[key]:
+        task.output_data = msg.data[key]
+    task.last_modified_date = datetime.utcnow()
+    db.session.add(task)
+    db.session.commit()
+
+@decorators.task(action="testing.hello_world", queue="hello_world")
+def hello_world(task):
+    name = task.input_data['name']
+    print "hello %s! sleeping..\n" % name
+    from time import sleep
+    sleep(5)
+    print "woke up! time to update back =)\n"
+    task.output_data = "hello %s!" % name

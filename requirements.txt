@@ -1,3 +1,5 @@
 flask
 flask-sqlalchemy
+apscheduler
 ipdb
+requests

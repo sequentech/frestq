@@ -15,13 +15,17 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
+from datetime import datetime
 
 from flask import Blueprint, request, make_response
-import json
+from flask import current_app
 
 from action_handlers import ActionHandlers
+from tasks import post_task
 
 api = Blueprint('api', __name__)
+
 
 def error(status, message=""):
     if message:
@@ -29,6 +33,20 @@ def error(status, message=""):
     else:
         data=""
     return make_response(data, status)
+
+
+def call_action_handler(msg_id, queue_name):
+    '''
+    Calls asynchronously to the action handler
+    '''
+    from models import Message
+    msg = Message.query.get(msg_id)
+    action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
+    if action_handler.get('is_task', False):
+        post_task(msg, action_handler)
+    else:
+        action_handler["handler_func"](msg)
+
 
 @api.route('/queues/<queue_name>/', methods=['POST'])
 def post_message(queue_name):
@@ -39,7 +57,7 @@ def post_message(queue_name):
     '''
     # 1. register message in the db model
 
-    from app import db
+    from app import db, scheduler
     from models import Message
     try:
         data = json.loads(request.data)
@@ -48,33 +66,40 @@ def post_message(queue_name):
 
     # check input data
     requirements = [
+        {'name': 'message_id', 'isinstance': basestring},
         {'name': 'action', 'isinstance': basestring},
         {'name': 'sender_url', 'isinstance': basestring},
     ]
     for req in requirements:
         if req['name'] not in data or not isinstance(data[req['name']],
             req['isinstance']):
-            return error(400, "invalid %s parameter" % req['name'])
+            return error(400, "invalid/notfound %s parameter" % req['name'])
 
-    # TODO: get the sender ssl cert
-    sender_ssl_cert = None
+    sender_ssl_cert = request.headers.get('X-Sender-SSL-Certificate', None)
 
-    kwargs = {
-            'action': data.get('action', ''),
-            'queue_name': queue_name,
-            'sender_url': data.get('sender_url', ''),
-            'receiver_url': request.url_root,
-            'sender_ssl_cert': sender_ssl_cert,
-            'input_data': data.get('input_data', None),
-            'input_async_data': data.get('input_async_data', None),
-            'pingback_date': data.get('pingback_date', None),
-            'expiration_date': data.get('expiration_date', None),
-            'info_text': data.get('info_text', None),
-            'task_id': data.get('task_id', None),
-    }
-    msg = Message(**kwargs)
-    db.session.add(msg)
-    db.session.commit()
+    # check for a local message
+    if data['sender_url'] == current_app.config.get('ROOT_URL'):
+        msg = Message.query.get(data['message_id'])
+    else:
+        kwargs = {
+                'id': data.get('message_id', ''),
+                'action': data.get('action', ''),
+                'queue_name': queue_name,
+                'sender_url': data.get('sender_url', ''),
+                'receiver_url': current_app.config.get('ROOT_URL'),
+                'is_received': True,
+                'sender_ssl_cert': sender_ssl_cert,
+                'input_data': data.get('input_data', None),
+                'input_async_data': data.get('input_async_data', None),
+                'pingback_date': data.get('pingback_date', None),
+                'expiration_date': data.get('expiration_date', None),
+                'info_text': data.get('info_text', None),
+                'task_id': data.get('task_id', None),
+                'output_status': 200
+        }
+        msg = Message(**kwargs)
+        db.session.add(msg)
+        db.session.commit()
 
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
     if not action_handler:
@@ -82,23 +107,8 @@ def post_message(queue_name):
             msg.action, queue_name))
 
     # 3. call to action handle
-    result = action_handler["handler_func"](msg)
+    scheduler.add_date_job(call_action_handler, datetime.utcnow(),
+        [msg.id, queue_name])
+
     # 4. return output message
-
-    data = {
-        "id": msg.id,
-        "data": msg.output_data,
-    }
-
-    if msg.output_async_data:
-        data['async_data'] = msg.output_async_data
-
-    if msg.task_id:
-        data['task_id'] = msg.task_id
-
-    if not msg.output_status:
-        msg.output_status = 200
-        db.session.add(msg)
-        db.session.commit()
-
-    return make_response(json.dumps(data), msg.output_status)
+    return make_response("", msg.output_status)

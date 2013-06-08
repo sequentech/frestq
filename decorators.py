@@ -23,11 +23,6 @@ def message_action(action, queue, **kwargs):
     """
     Decorator for message actions
     """
-    check_static = kwargs.pop('check_static', None)
-
-    if check_static:
-        lookup_variables = [check_static]
-
     # Check if perm is given as string in order not to decorate
     # view function itself which makes debugging harder
     if not isinstance(action, basestring) or not isinstance(queue, basestring):
@@ -47,6 +42,34 @@ def message_action(action, queue, **kwargs):
             being called.
             '''
             # TODO: Place some callbacks in the scheduler
+            return view_func(*args, **kwargs)
+        return wraps(view_func)(wrapped)
+    return decorator
+
+def task(action, queue, **kwargs):
+    """
+    Decorator for tasks
+    """
+
+    # Check if perm is given as string in order not to decorate
+    # view function itself which makes debugging harder
+    if not isinstance(action, basestring) or not isinstance(queue, basestring):
+        raise Exception("action and queue args for message decorator must be strings")
+
+    def decorator(view_func):
+        '''
+        This is the static wrapper, called when loading the code a wrapped
+        funcion
+        '''
+        # register view_func as an action handler for the given queue
+        kwargs['is_task'] = True
+        ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
+
+        def wrapped(*args, **kwargs):
+            '''
+            This is the runtime wrapper, called when a wrapped function is
+            being called.
+            '''
             return view_func(*args, **kwargs)
         return wraps(view_func)(wrapped)
     return decorator

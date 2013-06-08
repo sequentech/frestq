@@ -42,11 +42,13 @@ class Message(db.Model):
     Represents an election
     '''
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Unicode(128), primary_key=True)
 
     sender_url = db.Column(db.Unicode(1024))
 
     queue_name = db.Column(db.Unicode(1024))
+
+    is_received = db.Column(db.Boolean)
 
     receiver_url = db.Column(db.Unicode(1024))
 
@@ -64,17 +66,13 @@ class Message(db.Model):
 
     output_status = db.Column(db.Integer)
 
-    output_data = db.Column(JSONEncodedDict)
-
-    output_async_data = db.Column(JSONEncodedDict)
-
     pingback_date = db.Column(db.DateTime, default=None)
 
     expiration_date = db.Column(db.DateTime, default=None)
 
     info_text = db.Column(db.Unicode(2048))
 
-    task_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+    task_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
 
     task = db.relationship('Task',
         backref=db.backref('messages', lazy='dynamic'))
@@ -96,13 +94,12 @@ class Message(db.Model):
             'queue_name': self.queue_name,
             'sender_url': self.sender_url,
             'receiver_url': self.receiver_url,
+            'is_received': self.is_received,
             'sender_ssl_cert': self.sender_ssl_cert,
             'receiver_ssl_cert': self.receiver_ssl_cert,
             'created_date': self.created_date,
             'input_data': self.input_data,
             'input_async_data': self.input_async_data,
-            'output_data': self.output_data,
-            'output_async_data': self.output_async_data,
             'output_status': self.output_status,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
@@ -123,15 +120,28 @@ class Task(db.Model):
     '''
     __tablename__ = 'task'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Unicode(128), primary_key=True)
+
+    # this can be "simple", "chord", "synchronous"
+    task_type = db.Column(db.Unicode(1024))
+
+    # for example used in synchronous tasks to store the algorithm
+    task_metadata = db.Column(JSONEncodedDict)
 
     action = db.Column(db.Unicode(1024))
 
     status = db.Column(db.Unicode(1024))
 
-    parent_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+    is_received = db.Column(db.Boolean)
+
+    is_local = db.Column(db.Boolean, default=False)
+
+    parent_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
 
     subtasks = db.relationship("Task", lazy="joined", join_depth=1)
+
+    # used if it's a subtask
+    order = db.Column(db.Integer)
 
     receiver_url = db.Column(db.Unicode(1024))
 
@@ -161,6 +171,10 @@ class Task(db.Model):
 
     expiration_pending = db.Column(db.Boolean, default=False)
 
+    # used to store scheduled jobs and remove them when they have finished
+    # or need to be removed
+    jobs = dict()
+
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
@@ -176,8 +190,11 @@ class Task(db.Model):
             'id': self.id,
             'action': self.action,
             'status': self.status,
+            'order': self.order,
             'sender_url': self.sender_url,
             'receiver_url': self.receiver_url,
+            'is_received': self.is_received,
+            'is_local': self.is_local,
             'sender_ssl_cert': self.sender_ssl_cert,
             'receiver_ssl_cert': self.receiver_ssl_cert,
             'created_date': self.created_date,
@@ -194,8 +211,31 @@ class Task(db.Model):
         }
 
         if full:
-            ret['task'] = self.task.to_dict()
+            ret['parent'] = self.parent.to_dict()
         else:
-            ret['task_id'] = self.task.id
+            ret['parent_id'] = self.parent.d
 
         return ret
+
+
+
+class ReceiverTask(Task):
+    # set this to true to send an update to the sender
+    send_update_to_sender = False
+
+    # set this to true when you want to automatically finish your task and send
+    # an update to sender with the finished state. This is for example set to
+    # true in ReceiverSimpleTasks but to False in ChordTasks, because chords
+    # send auto finish when all subtask have finished (execute does that).
+    auto_finish_after_handler = False
+
+
+class ReceiverSimpleTask(Task):
+    '''
+    Represents a simple task
+    '''
+    send_update_to_sender = True
+
+    auto_finish_after_handler = True
+    def execute(self):
+        pass
