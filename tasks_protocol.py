@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
@@ -16,5 +15,13 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
-from app import db
-db.create_all()
+
+from flask import Blueprint, request, make_response
+import json
+
+from action_handlers import ActionHandlers
+import decorators
+
+@decorators.message_action(action="frestq.hello", queue="frestq")
+def hello(msg):
+    msg.output_data = dict(info="hello world!")

@@ -46,5 +46,8 @@ import models
 from api import api as api_v1
 app.register_blueprint(api_v1, url_prefix='/api/v1')
 
+from tasks_protocol import *
+
 if __name__ == "__main__":
+    # TODO: use sched to schedule and handle events
     app.run(threaded=True)

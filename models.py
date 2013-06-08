@@ -1,18 +1,19 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# This file is part of election-orchestra.
+# This file is part of frestq.
 # Copyright (C) 2013  Eduardo Robles Elvira <edulix AT wadobo DOT com>
 
 # election-orchestra is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
+# it under the terms of the GNU Lesser General Public License as published by
 # the Free Software Foundation, either version 3 of the License.
 
 # election-orchestra  is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
+# GNU Lesser General Public License for more details.
 
-# You should have received a copy of the GNU Affero General Public License
+# You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
 from flask import Flask, jsonify
@@ -23,6 +24,19 @@ from app import db
 from sqlalchemy.types import TypeDecorator, VARCHAR
 import json
 
+class JSONEncodedDict(TypeDecorator):
+    impl = VARCHAR
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if not value:
+            return None
+        return json.loads(value)
+
 class Message(db.Model):
     '''
     Represents an election
@@ -31,6 +45,8 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     sender_url = db.Column(db.Unicode(1024))
+
+    queue_name = db.Column(db.Unicode(1024))
 
     receiver_url = db.Column(db.Unicode(1024))
 
@@ -42,21 +58,23 @@ class Message(db.Model):
 
     action = db.Column(db.Unicode(1024))
 
-    input_data = db.Column(db.UnicodeText)
+    input_data = db.Column(JSONEncodedDict)
 
-    input_async_data = db.Column(db.UnicodeText)
+    input_async_data = db.Column(JSONEncodedDict)
 
-    output_status = db.Column(db.Unicode(255))
+    output_status = db.Column(db.Integer)
 
-    output_data = db.Column(db.UnicodeText)
+    output_data = db.Column(JSONEncodedDict)
 
-    output_async_data = db.Column(db.UnicodeText)
+    output_async_data = db.Column(JSONEncodedDict)
 
     pingback_date = db.Column(db.DateTime, default=None)
 
     expiration_date = db.Column(db.DateTime, default=None)
 
     info_text = db.Column(db.Unicode(2048))
+
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'))
 
     task = db.relationship('Task',
         backref=db.backref('messages', lazy='dynamic'))
@@ -75,6 +93,7 @@ class Message(db.Model):
         ret = {
             'id': self.id,
             'action': self.action,
+            'queue_name': self.queue_name,
             'sender_url': self.sender_url,
             'receiver_url': self.receiver_url,
             'sender_ssl_cert': self.sender_ssl_cert,
@@ -102,6 +121,7 @@ class Task(db.Model):
     '''
     Represents a task
     '''
+    __tablename__ = 'task'
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -109,8 +129,9 @@ class Task(db.Model):
 
     status = db.Column(db.Unicode(1024))
 
-    parent_task = db.relationship('Task',
-        backref=db.backref('subtasks', lazy='dynamic'))
+    parent_id = db.Column(db.Integer, db.ForeignKey('task.id'))
+
+    subtasks = db.relationship("Task", lazy="joined", join_depth=1)
 
     receiver_url = db.Column(db.Unicode(1024))
 
@@ -124,13 +145,13 @@ class Task(db.Model):
 
     last_modified_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-    input_data = db.Column(db.UnicodeText)
+    input_data = db.Column(JSONEncodedDict)
 
-    input_async_data = db.Column(db.UnicodeText)
+    input_async_data = db.Column(JSONEncodedDict)
 
-    output_data = db.Column(db.UnicodeText)
+    output_data = db.Column(JSONEncodedDict)
 
-    output_async_data = db.Column(db.UnicodeText)
+    output_async_data = db.Column(JSONEncodedDict)
 
     pingback_date = db.Column(db.DateTime, default=None)
 

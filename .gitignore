@@ -1,3 +1,4 @@
 *.sqlite
 *.kdev4
 *.pyc
+custom_settings.py
