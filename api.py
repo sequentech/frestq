@@ -42,7 +42,7 @@ def call_action_handler(msg_id, queue_name):
     Calls asynchronously to the action handler
     '''
     from models import Message
-    logging.debug('Action handler for msg_id %s (queue %s)' % (
+    logging.debug('EXEC ACTION handler for MESSAGE id %s (QUEUE %s)' % (
         msg_id, queue_name))
     msg = Message.query.get(msg_id)
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
@@ -63,7 +63,7 @@ def post_message(queue_name):
 
     from app import db, get_scheduler
     from models import Message
-    logging.debug('Received data message in queue %s' % queue_name)
+    logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
     try:
         data = json.loads(request.data)
     except:
@@ -84,10 +84,10 @@ def post_message(queue_name):
 
     # check for a local message
     if data['sender_url'] == current_app.config.get('ROOT_URL'):
-        logging.debug('The message is local and with id %s' % data['message_id'])
+        logging.debug('The MESSAGE is LOCAL and with id %s' % data['message_id'])
         msg = Message.query.get(data['message_id'])
     else:
-        logging.debug('The message is not local and with id %s' % data['message_id'])
+        logging.debug('The MESSAGE is NOT LOCAL and with id %s' % data['message_id'])
         kwargs = {
                 'id': data.get('message_id', ''),
                 'action': data.get('action', ''),

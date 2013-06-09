@@ -24,6 +24,7 @@ from flask import current_app
 
 from action_handlers import ActionHandlers
 from tasks import SimpleTask
+import decorators
 
 user_api = Blueprint('user_api', __name__)
 
@@ -39,3 +40,22 @@ def post_hello(username):
     )
     task.create_and_send()
     return make_response("", 200)
+
+@decorators.task(action="testing.hello_world", queue="hello_world")
+def hello_world(task):
+    username = task.data.input_data['username']
+    print "hello %s! sleeping..\n" % username
+    from time import sleep
+    sleep(5)
+    if len(username) < 10:
+        subtask = SimpleTask(
+            receiver_url='http://localhost:5001/api/queues',
+            action="testing.hello_world",
+            queue="hello_world",
+            data={
+                'username': username*2
+            }
+        )
+        task.add(subtask)
+    print "woke up! time to update back =)\n"
+    task.data.output_data = "hello %s!" % username

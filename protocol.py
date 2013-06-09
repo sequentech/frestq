@@ -28,9 +28,11 @@ import decorators
 @decorators.message_action(action="frestq.update_task", queue="frestq")
 def update_task(msg):
     from app import db
+    from models import Task as ModelTask
+    from tasks import ReceiverTask
 
     task = msg.task
-    logging.debug("updating task with id %s" % task.id)
+    logging.debug("UPDATING TASK with id %s" % task.id)
     if task.status == "finished" and msg.data['status'] != 'error':
         # error, cannot update an already finished task (unless it's an error)!
         # TODO: send back an error update
@@ -44,11 +46,11 @@ def update_task(msg):
     db.session.add(task)
     db.session.commit()
 
-@decorators.task(action="testing.hello_world", queue="hello_world")
-def hello_world(task):
-    username = task.data.input_data['username']
-    print "hello %s! sleeping..\n" % username
-    from time import sleep
-    sleep(5)
-    print "woke up! time to update back =)\n"
-    task.data.output_data = "hello %s!" % username
+    if task.status != 'finished':
+        return
+
+    # task finished. check if there's a parent task, and if so do_next() it
+    if task.parent_id:
+        parent = db.session.query(ModelTask).get(task.parent_id)
+        parent_task = ReceiverTask.instance_by_model(parent)
+        parent_task.do_next()

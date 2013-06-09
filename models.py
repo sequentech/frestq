@@ -134,6 +134,8 @@ class Task(db.Model):
 
     action = db.Column(db.Unicode(1024))
 
+    queue_name = db.Column(db.Unicode(1024))
+
     status = db.Column(db.Unicode(1024))
 
     is_received = db.Column(db.Boolean)
@@ -193,6 +195,7 @@ class Task(db.Model):
         ret = {
             'id': self.id,
             'action': self.action,
+            'queue_name': self.queue_name,
             'status': self.status,
             'order': self.order,
             'sender_url': self.sender_url,
