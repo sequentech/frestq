@@ -15,7 +15,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import unicode_literals
 import json
+import logging
 from datetime import datetime
 
 from flask import Blueprint, request, make_response
@@ -40,6 +42,8 @@ def call_action_handler(msg_id, queue_name):
     Calls asynchronously to the action handler
     '''
     from models import Message
+    logging.debug('Action handler for msg_id %s (queue %s)' % (
+        msg_id, queue_name))
     msg = Message.query.get(msg_id)
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
     if action_handler.get('is_task', False):
@@ -57,8 +61,9 @@ def post_message(queue_name):
     '''
     # 1. register message in the db model
 
-    from app import db, scheduler
+    from app import db, get_scheduler
     from models import Message
+    logging.debug('Received data message in queue %s' % queue_name)
     try:
         data = json.loads(request.data)
     except:
@@ -79,8 +84,10 @@ def post_message(queue_name):
 
     # check for a local message
     if data['sender_url'] == current_app.config.get('ROOT_URL'):
+        logging.debug('The message is local and with id %s' % data['message_id'])
         msg = Message.query.get(data['message_id'])
     else:
+        logging.debug('The message is not local and with id %s' % data['message_id'])
         kwargs = {
                 'id': data.get('message_id', ''),
                 'action': data.get('action', ''),
@@ -89,8 +96,8 @@ def post_message(queue_name):
                 'receiver_url': current_app.config.get('ROOT_URL'),
                 'is_received': True,
                 'sender_ssl_cert': sender_ssl_cert,
-                'input_data': data.get('input_data', None),
-                'input_async_data': data.get('input_async_data', None),
+                'input_data': data.get('data', None),
+                'input_async_data': data.get('async_data', None),
                 'pingback_date': data.get('pingback_date', None),
                 'expiration_date': data.get('expiration_date', None),
                 'info_text': data.get('info_text', None),
@@ -103,12 +110,13 @@ def post_message(queue_name):
 
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
     if not action_handler:
+        logging.error('Action handler for action %s (message id %s)' % (
+            msg.action, msg.id))
         return error(404, "Action handler %s not found in the queue %s" %(
             msg.action, queue_name))
 
     # 3. call to action handle
-    scheduler.add_date_job(call_action_handler, datetime.utcnow(),
-        [msg.id, queue_name])
+    get_scheduler().add_now_job(call_action_handler, [msg.id, queue_name])
 
     # 4. return output message
     return make_response("", msg.output_status)

@@ -16,13 +16,16 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
-from flask import Flask, jsonify
-from flask.ext.sqlalchemy import SQLAlchemy
+from __future__ import unicode_literals
+import json
 from datetime import datetime
-from app import db
 
 from sqlalchemy.types import TypeDecorator, VARCHAR
-import json
+from flask import Flask, jsonify
+from flask.ext.sqlalchemy import SQLAlchemy
+
+from app import db
+
 
 class JSONEncodedDict(TypeDecorator):
     impl = VARCHAR
@@ -41,6 +44,7 @@ class Message(db.Model):
     '''
     Represents an election
     '''
+    __tablename__ = 'message'
 
     id = db.Column(db.Unicode(128), primary_key=True)
 
@@ -216,26 +220,3 @@ class Task(db.Model):
             ret['parent_id'] = self.parent.d
 
         return ret
-
-
-
-class ReceiverTask(Task):
-    # set this to true to send an update to the sender
-    send_update_to_sender = False
-
-    # set this to true when you want to automatically finish your task and send
-    # an update to sender with the finished state. This is for example set to
-    # true in ReceiverSimpleTasks but to False in ChordTasks, because chords
-    # send auto finish when all subtask have finished (execute does that).
-    auto_finish_after_handler = False
-
-
-class ReceiverSimpleTask(Task):
-    '''
-    Represents a simple task
-    '''
-    send_update_to_sender = True
-
-    auto_finish_after_handler = True
-    def execute(self):
-        pass

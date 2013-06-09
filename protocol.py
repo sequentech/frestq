@@ -15,9 +15,12 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import unicode_literals
+import json
+from datetime import datetime
+import logging
 
 from flask import Blueprint, request, make_response
-import json
 
 from action_handlers import ActionHandlers
 import decorators
@@ -27,23 +30,25 @@ def update_task(msg):
     from app import db
 
     task = msg.task
-    if task.status == "finished":
-        # error, cannot update an already finished task!
+    logging.debug("updating task with id %s" % task.id)
+    if task.status == "finished" and msg.data['status'] != 'error':
+        # error, cannot update an already finished task (unless it's an error)!
         # TODO: send back an error update
         return
 
     keys = ['output_data', 'status', 'output_async_data']
-    if msg.data[key]:
-        task.output_data = msg.data[key]
+    for key in keys:
+        if key in msg.input_data:
+            task.output_data = msg.input_data[key]
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
 
 @decorators.task(action="testing.hello_world", queue="hello_world")
 def hello_world(task):
-    name = task.input_data['name']
-    print "hello %s! sleeping..\n" % name
+    username = task.data.input_data['username']
+    print "hello %s! sleeping..\n" % username
     from time import sleep
     sleep(5)
     print "woke up! time to update back =)\n"
-    task.output_data = "hello %s!" % name
+    task.data.output_data = "hello %s!" % username

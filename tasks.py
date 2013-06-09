@@ -15,11 +15,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
-from uuid import uuid4
-from flask import request
-from datetime import datetime
-from flask import current_app
+from __future__ import unicode_literals
 import requests
+import logging
+import json
+from uuid import uuid4
+from datetime import datetime
+
+from flask import request
+from flask import current_app
 
 class SimpleTask(object):
     receiver_url = None
@@ -42,6 +46,7 @@ class SimpleTask(object):
         from models import Task as ModelTask, Message as ModelMessage
 
         # create task
+        logging.debug('Creating local Task for action %s' % self.action)
         kwargs = {
             'action': self.action,
             'queue_name': self.queue,
@@ -71,8 +76,38 @@ class SimpleTask(object):
             'data': task.input_data,
             'task_id': task.id
         }
+        logging.debug('Sending task message to %s' % task.receiver_url)
         send_message(msg_data)
 
+
+
+class ReceiverTask(object):
+    # set this to true to send an update to the sender
+    send_update_to_sender = False
+
+    # set this to true when you want to automatically finish your task and send
+    # an update to sender with the finished state. This is for example set to
+    # true in ReceiverSimpleTasks but to False in ChordTasks, because chords
+    # send auto finish when all subtask have finished (execute does that).
+    auto_finish_after_handler = False
+
+    def __init__(self, task_model):
+        self.data = task_model
+
+    def execute(self):
+        pass
+
+
+class ReceiverSimpleTask(ReceiverTask):
+    '''
+    Represents a simple task
+    '''
+    send_update_to_sender = True
+
+    auto_finish_after_handler = True
+
+    def __init__(self, task_model):
+        super(ReceiverSimpleTask, self).__init__(task_model)
 
 def send_message(msg_data):
     '''
@@ -91,16 +126,18 @@ def send_message(msg_data):
     * expiration_date
     * info
     '''
-    from app import db
+    from app import db, app
     from models import Task as ModelTask, Message as ModelMessage
 
     # create message and save it in the database
     msg_data = msg_data.copy()
     msg_data['id'] =  str(uuid4())
     msg_data['is_received'] = False
-    msg_data['sender_url'] = current_app.config.get('ROOT_URL')
-    msg_data['sender_ssl_cert'] = current_app.config.get('SSL_CERT_STRING', '')
+    msg_data['sender_url'] = app.config.get('ROOT_URL')
+    msg_data['sender_ssl_cert'] = app.config.get('SSL_CERT_STRING', '')
     msg = ModelMessage(**msg_data)
+    db.session.add(msg)
+    db.session.commit()
 
     # send it to the peer
     url =  "%s/%s/" % (msg_data['receiver_url'], msg_data['queue_name'])
@@ -115,8 +152,11 @@ def send_message(msg_data):
         if opt in msg_data:
             payload[opt] = msg_data[opt]
 
+    logging.debug('Sending message id %s with action %s to %s' % (
+        msg.id, msg.action, url))
+
     # TODO: use and check ssl certs here
-    r = requests.post(url, data=payload)
+    r = requests.post(url, data=json.dumps(payload))
 
     # TODO: check r.status_code and do some retries if it failed
     msg.output_status = r.status_code
@@ -133,6 +173,7 @@ def send_task_update(task_id):
     task.output_async_data
     task.output_status
     '''
+    logging.debug("sending update to task with id %s" % task_id)
     from app import db
     from models import Task as ModelTask, Message as ModelMessage
     task = ModelTask.query.get(task_id)
@@ -158,19 +199,18 @@ def post_task(msg, action_handler):
     Called by api.post_message when action_handler is of type "task". Creates
     the requested task and processes it.
     '''
-    from app import db, scheduler
-    from models import (Task as ModelTask,
-                        Message as ModelMessage,
-                        ReceiverSimpleTask)
+    from app import db, get_scheduler, app
+    from models import Task as ModelTask, Message as ModelMessage
 
     # 1. create received task
+    is_local = msg.sender_url == app.config.get('ROOT_URL')
     kwargs = {
         'action': msg.action,
         'queue_name': msg.queue_name,
         'sender_url': msg.sender_url,
-        'receiver_url': request.url_root,
+        'receiver_url': msg.receiver_url,
         'is_received': msg.is_received,
-        'is_local': msg.is_local,
+        'is_local': is_local,
         'sender_ssl_cert': msg.sender_ssl_cert,
         'input_data': msg.input_data,
         'input_async_data': msg.input_async_data,
@@ -190,7 +230,7 @@ def post_task(msg, action_handler):
     # TODO: In the future it will be a ReceiverChordTask
 
     # if msg originated from ourselves, it might already exist
-    if msg.is_local:
+    if is_local:
         model_task = ModelTask.query.get(msg.task_id)
     else:
         model_task = ModelTask(**kwargs)
@@ -202,11 +242,10 @@ def post_task(msg, action_handler):
 
     # 4. update asynchronously the task sender if requested
     if task.auto_finish_after_handler:
-        task.output_status = "finished"
+        model_task.output_status = "finished"
 
     if task.send_update_to_sender:
-        scheduler.add_date_job(send_task_update, datetime.utcnow(),
-            [task.id])
+        get_scheduler().add_now_job(send_task_update, [model_task.id])
 
     # 3. execute the task synchronously
     #
