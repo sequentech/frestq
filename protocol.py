@@ -41,16 +41,19 @@ def update_task(msg):
     keys = ['output_data', 'status', 'output_async_data']
     for key in keys:
         if key in msg.input_data:
-            task.output_data = msg.input_data[key]
+            if isinstance(msg.input_data[key], basestring):
+                logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
+                    msg.input_data[key]))
+            setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
 
-    if task.status != 'finished':
-        return
+    # do next (it might be a task with a parent task)
+    receiver_task = ReceiverTask.instance_by_model(task)
+    receiver_task.do_next()
 
-    # task finished. check if there's a parent task, and if so do_next() it
-    if task.parent_id:
-        parent = db.session.query(ModelTask).get(task.parent_id)
-        parent_task = ReceiverTask.instance_by_model(parent)
-        parent_task.do_next()
+
+@decorators.task(action="frestq.virtual_empty_task", queue="frestq")
+def virtual_empty_task(task):
+    logging.debug("EXECUTING virtual EMPTY TASK with id %s" % task.task_model.id)

@@ -24,7 +24,48 @@ from datetime import datetime
 
 from flask import request
 
-class SimpleTask(object):
+class BaseTask(object):
+    task_model = None
+
+    def __init__(self):
+        super(BaseTask, self).__init__()
+        pass
+
+    def create(self):
+        '''
+        Reimplement
+        '''
+        return None
+
+    def create_and_send(self):
+        '''
+        Create the task in the DB and sends the task to the receiver
+        '''
+        task = self.create()
+        self.send()
+
+    def send(self):
+        # send task
+        from app import app, db
+        msg_data = {
+            'action': self.task_model.action,
+            'queue_name': self.task_model.queue_name,
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': self.task_model.receiver_url,
+            'data': self.task_model.input_data,
+            'task_id': self.task_model.id
+        }
+        logging.debug('SEND task MESSAGE to %s, TASK id = %s' % (
+            self.task_model.receiver_url, msg_data['task_id']))
+
+        # update db
+        self.task_model.status = "sent"
+        db.session.add(self.task_model)
+        db.session.commit()
+
+        send_message(msg_data)
+
+class SimpleTask(BaseTask):
     receiver_url = None
     action = None
     queue = None
@@ -36,6 +77,7 @@ class SimpleTask(object):
 
     def __init__(self, receiver_url, action, queue, data=None, async_data=None,
             info_text=None, pingback_date=None, expiration_date=None):
+        super(SimpleTask, self).__init__()
         self.receiver_url = receiver_url
         self.action = action
         self.data = data
@@ -56,10 +98,10 @@ class SimpleTask(object):
             pingback_date=task_model.pingback_date,
             expiration_date=task_model.expiration_date
         )
-        ret.model_task = task_model
+        ret.task_model = task_model
         return ret
 
-    def create(self, commit=True):
+    def create(self):
         '''
         Create the task in the DB and returns the model
         '''
@@ -88,39 +130,79 @@ class SimpleTask(object):
             'task_type': 'simple',
             'parent_id': None
         }
-        self.model_task = ModelTask(**kwargs)
-        if commit:
-            db.session.add(self.model_task)
-            db.session.commit()
-        return self.model_task
+        self.task_model = ModelTask(**kwargs)
+        db.session.add(self.task_model)
+        db.session.commit()
+        return self.task_model
 
-    def create_and_send(self):
-        '''
-        Create the task in the DB and sends the task to the receiver
-        '''
-        task = self.create()
-        self.send()
 
-    def send(self):
-        # send task
-        from app import app, db
-        msg_data = {
-            'action': self.model_task.action,
-            'queue_name': self.model_task.queue_name,
-            'sender_url': app.config.get('ROOT_URL'),
-            'receiver_url': self.model_task.receiver_url,
-            'data': self.model_task.input_data,
-            'task_id': self.model_task.id
-        }
-        logging.debug('SEND task MESSAGE to %s, TASK id = %s' % (
-            self.model_task.receiver_url, msg_data['task_id']))
+class ChordTask(BaseTask):
+    _subtasks = []
 
-        # update db
-        self.model_task.status = "sent"
-        db.session.add(self.model_task)
+    def __init__(self):
+        super(ChordTask, self).__init__()
+        self._subtasks = []
+
+    def add(self, subtask):
+        if not self.task_model:
+            self._subtasks.append(subtask)
+            return
+
+        from app import db
+        model = subtask.create()
+        model.order = self.count_subtasks()
+        model.parent_id = self.task_model.id
+        db.session.add(model)
         db.session.commit()
 
-        send_message(msg_data)
+    def count_subtasks(self):
+        '''
+        Count the number of subtasks
+        '''
+        from app import db
+        from models import Task as ModelTask
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").count()
+
+    def create(self):
+        '''
+        Create the task in the DB and returns the model
+        '''
+        from app import db, app
+        from models import Task as ModelTask, Message as ModelMessage
+
+        # create task
+        task_id = str(uuid4())
+        logging.debug('CREATE local CHORD TASK with ID %s' % task_id)
+        kwargs = {
+            'action': 'frestq.virtual_empty_task',
+            'queue_name': 'frestq',
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': app.config.get('ROOT_URL'),
+            'is_received': False,
+            'is_local': True,
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'input_data': dict(),
+            'input_async_data': dict(),
+            'pingback_date': None,
+            'expiration_date': None,
+            'info_text': None,
+            'id': task_id,
+            'status': 'created',
+            'task_type': 'chord',
+            'parent_id': None
+        }
+        self.task_model = ModelTask(**kwargs)
+        # create also subtasks
+        i = 0
+        for subtask in self._subtasks:
+            subtask_model = subtask.create()
+            subtask_model.order = i
+            subtask_model.parent_id = self.task_model.id
+            db.session.add(subtask_model)
+            i += 1
+        db.session.add(self.task_model)
+        db.session.commit()
+        return self.task_model
 
 
 class ReceiverTask(object):
@@ -134,10 +216,10 @@ class ReceiverTask(object):
     auto_finish_after_handler = False
 
     # reference to the task model
-    data = None
+    task_model = None
 
     def __init__(self, task_model):
-        self.data = task_model
+        self.task_model = task_model
 
     def do_next(self):
         '''
@@ -147,8 +229,8 @@ class ReceiverTask(object):
         from app import db
         from models import Task as ModelTask
         # check if there's a parent task, and if so do_next() it
-        if self.data.parent_id:
-            parent = db.session.query(ModelTask).get(self.data.parent_id)
+        if self.task_model.parent_id:
+            parent = db.session.query(ModelTask).get(self.task_model.parent_id)
             parent_task = ReceiverTask.instance_by_model(parent)
             parent_task.do_next()
 
@@ -193,8 +275,9 @@ class ReceiverSimpleTask(ReceiverTask):
 
         NOTE: When it's a local task, it's also sent.
         '''
-        simple_task = SimpleTask.create_from_model(self.data)
+        simple_task = SimpleTask.create_from_model(self.task_model)
         simple_task.send()
+
 
 class ReceiverChordTask(ReceiverTask):
     '''
@@ -218,7 +301,7 @@ class ReceiverChordTask(ReceiverTask):
         from app import db
         model = subtask.create()
         model.order = self.count_subtasks()
-        model.parent_id = self.data.id
+        model.parent_id = self.task_model.id
         db.session.add(model)
         db.session.commit()
 
@@ -228,7 +311,7 @@ class ReceiverChordTask(ReceiverTask):
         '''
         from app import db
         from models import Task as ModelTask
-        return db.session.query(ModelTask).with_parent(self.data, "subtasks").count()
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").count()
 
     def next_subtask(self):
         '''
@@ -236,7 +319,7 @@ class ReceiverChordTask(ReceiverTask):
         '''
         from app import db
         from models import Task as ModelTask
-        return db.session.query(ModelTask).with_parent(self.data, "subtasks").\
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
     def execute(self):
@@ -257,21 +340,21 @@ class ReceiverChordTask(ReceiverTask):
         # if there's no subtask left to do, send the finished signal to the
         # task creator
         if not next_subtask_model:
-            self.data.status = "finished"
+            self.task_model.status = "finished"
             from app import db
-            db.session.add(self.data)
+            db.session.add(self.task_model)
             db.session.commit()
-            if not self.data.is_local:
-                get_scheduler().add_now_job(send_task_update, [self.data.id])
+            if not self.task_model.is_local:
+                get_scheduler().add_now_job(send_task_update, [self.task_model.id])
 
             # check if there's a parent task, and if so do_next() it
-            if self.data.parent_id:
-                parent_model = db.session.query(ModelTask).get(self.data.parent_id)
+            if self.task_model.parent_id:
+                parent_model = db.session.query(ModelTask).get(self.task_model.parent_id)
                 parent_task = ReceiverTask.instance_by_model(parent_model)
                 parent_task.do_next()
             return
 
-        if next_subtask_model.status == 'sent':
+        if next_subtask_model.status in ['sent', 'executing', 'error']:
             return
 
         # execute next subtask
@@ -353,9 +436,9 @@ def send_task_update(task_id):
         "receiver_url": task.sender_url,
         "receiver_ssl_cert": task.sender_ssl_cert,
         "data": {
-            'task.output_data': task.output_data,
-            'task.output_async_data': task.output_async_data,
-            'task.status': task.status
+            'output_data': task.output_data,
+            'output_async_data': task.output_async_data,
+            'status': task.status
         },
         "task_id": task.id
     }
@@ -364,6 +447,12 @@ def send_task_update(task_id):
     db.session.add(task)
     db.session.commit()
 
+    # task finished. check if there's a parent task, and if so do_next() it
+    if task.parent_id:
+        parent = db.session.query(ModelTask).get(task.parent_id)
+        parent_task = ReceiverTask.instance_by_model(parent)
+        parent_task.do_next()
+
 def post_task(msg, action_handler):
     '''
     Called by api.post_message when action_handler is of type "task". Creates
@@ -371,6 +460,8 @@ def post_task(msg, action_handler):
     '''
     from app import db, get_scheduler, app
     from models import Task as ModelTask, Message as ModelMessage
+
+    logging.debug('EXEC TASK with id %s' % msg.task_id)
 
     # 1. create received task
     is_local = msg.sender_url == app.config.get('ROOT_URL')
@@ -401,28 +492,28 @@ def post_task(msg, action_handler):
 
     # if msg originated from ourselves, it might already exist
     if is_local:
-        model_task = ModelTask.query.get(msg.task_id)
-        if model_task.task_type != 'chord':
+        task_model = ModelTask.query.get(msg.task_id)
+        if task_model.task_type == 'simple':
             # this could happen if the task was created with ReceiverSimpleTask
-            model_task.task_type = 'chord'
-            db.session.add(model_task)
+            task_model.task_type = 'chord'
+            db.session.add(task_model)
             db.session.commit()
     else:
-        model_task = ModelTask(**kwargs)
-        db.session.add(model_task)
+        task_model = ModelTask(**kwargs)
+        db.session.add(task_model)
         db.session.commit()
 
-    task = ReceiverTask.instance_by_model(model_task)
+    task = ReceiverTask.instance_by_model(task_model)
     action_handler['handler_func'](task)
 
     # 3. update asynchronously the task sender if requested
     if task.auto_finish_after_handler:
-        model_task.status = "finished"
-        db.session.add(model_task)
+        task_model.status = "finished"
+        db.session.add(task_model)
         db.session.commit()
 
     if task.send_update_to_sender:
-        get_scheduler().add_now_job(send_task_update, [model_task.id])
+        get_scheduler().add_now_job(send_task_update, [task_model.id])
 
     # 4. do_next the task synchronously
     #

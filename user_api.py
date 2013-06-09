@@ -23,7 +23,7 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from action_handlers import ActionHandlers
-from tasks import SimpleTask
+from tasks import SimpleTask, ChordTask
 import decorators
 
 user_api = Blueprint('user_api', __name__)
@@ -43,19 +43,60 @@ def post_hello(username):
 
 @decorators.task(action="testing.hello_world", queue="hello_world")
 def hello_world(task):
-    username = task.data.input_data['username']
+    '''
+    complex tree of subtasks are executed:
+      hello_world (current local task :5001, chord)
+        |
+        |-- subchord (local virtual task :5001, chord)
+               |
+               |-- subsubtask1/goodbye_cruel_world (local task :5001, simple)
+               |
+               |-- subsubtask2(goodbye_cruel_world (remote task :5000, simple)
+
+    when all the subtasks are executed, the sender (:5000  via post_hello)
+    is notified that the initial task is finished.
+    '''
+    username = task.task_model.input_data['username']
     print "hello %s! sleeping..\n" % username
+
     from time import sleep
     sleep(5)
-    if len(username) < 10:
-        subtask = SimpleTask(
-            receiver_url='http://localhost:5001/api/queues',
-            action="testing.hello_world",
-            queue="hello_world",
-            data={
-                'username': username*2
-            }
-        )
-        task.add(subtask)
-    print "woke up! time to update back =)\n"
-    task.data.output_data = "hello %s!" % username
+
+    subchord = ChordTask()
+    task.add(subchord)
+
+    subsubtask1 = SimpleTask(
+        receiver_url='http://localhost:5001/api/queues',
+        action="testing.goodbye_cruel_world",
+        queue="hello_world",
+        data={
+            'username': username*2
+        }
+    )
+    subchord.add(subsubtask1)
+
+    subsubtask2 = SimpleTask(
+        receiver_url='http://localhost:5000/api/queues',
+        action="testing.goodbye_cruel_world",
+        queue="hello_world",
+        data={
+            'username': username*2
+        }
+    )
+    subchord.add(subsubtask2)
+
+
+    print "woke up! time to finish =)\n"
+    task.task_model.output_data = "hello %s!" % username
+
+
+@decorators.task(action="testing.goodbye_cruel_world", queue="hello_world")
+def goodbye_cruel_world(task):
+    username = task.task_model.input_data['username']
+    print "goodbye %s! sleeping..\n" % username
+
+    from time import sleep
+    sleep(1)
+
+    print "woke up! time to finish =)\n"
+    task.task_model.output_data = "goodbye %s!" % username
