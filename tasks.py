@@ -205,6 +205,65 @@ class SequentialTask(BaseTask):
         return self.task_model
 
 
+class ParallelTask(BaseTask):
+    _subtasks = []
+
+    def __init__(self):
+        super(ParallelTask, self).__init__()
+        self._subtasks = []
+
+    def add(self, subtask):
+        if not self.task_model:
+            self._subtasks.append(subtask)
+            return
+
+        from app import db
+        model = subtask.create()
+        model.parent_id = self.task_model.id
+        db.session.add(model)
+        db.session.commit()
+
+    def create(self):
+        '''
+        Create the task in the DB and returns the model
+        '''
+        from app import db, app
+        from models import Task as ModelTask, Message as ModelMessage
+
+        # create task
+        task_id = str(uuid4())
+        logging.debug('CREATE local PARALLEL TASK with ID %s' % task_id)
+        kwargs = {
+            'action': 'frestq.virtual_empty_task',
+            'queue_name': 'frestq',
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': app.config.get('ROOT_URL'),
+            'is_received': False,
+            'is_local': True,
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'input_data': dict(),
+            'input_async_data': dict(),
+            'pingback_date': None,
+            'expiration_date': None,
+            'info_text': None,
+            'id': task_id,
+            'status': 'created',
+            'task_type': 'parallel',
+            'parent_id': None
+        }
+        self.task_model = ModelTask(**kwargs)
+        # create also subtasks
+        i = 0
+        for subtask in self._subtasks:
+            subtask_model = subtask.create()
+            subtask_model.parent_id = self.task_model.id
+            db.session.add(subtask_model)
+            i += 1
+        db.session.add(self.task_model)
+        db.session.commit()
+        return self.task_model
+
+
 class ReceiverTask(object):
     # set this to true to send an update to the sender
     send_update_to_sender = False
@@ -243,6 +302,8 @@ class ReceiverTask(object):
             return ReceiverSimpleTask(task_model)
         elif task_model.task_type == 'sequential':
             return ReceiverSequentialTask(task_model)
+        elif task_model.task_type == 'parallel':
+            return ReceiverParallelTask(task_model)
         else:
             raise Exception('unknown %s task type' % task_model.task_type)
 
@@ -281,8 +342,9 @@ class ReceiverSimpleTask(ReceiverTask):
 
 class ReceiverSequentialTask(ReceiverTask):
     '''
-    Represents the kind of base task executed when received by a frestq node.
-    You can easily add subtasks with add() method.
+    Sequential task executed when received by a frestq node.
+    You can easily add subtasks with add() method. Each subtask are executed
+    sequentially and in order.
 
     Subtasks will begin to be processed asynchronously when do_next() function
     is called.
@@ -337,15 +399,19 @@ class ReceiverSequentialTask(ReceiverTask):
         from models import Task as ModelTask
         next_subtask_model = self.next_subtask()
 
-        # if there's no subtask left to do, send the finished signal to the
-        # task creator
+        # check if there's no subtask left to do, and send the do next signal
+        # for parent task if it has one, and send the finished update to the
+        # sender if it's not local
         if not next_subtask_model:
             self.task_model.status = "finished"
             from app import db
             db.session.add(self.task_model)
             db.session.commit()
+
+            # update the sender if any
             if not self.task_model.is_local:
                 get_scheduler().add_now_job(send_task_update, [self.task_model.id])
+
 
             # check if there's a parent task, and if so do_next() it
             if self.task_model.parent_id:
@@ -360,6 +426,102 @@ class ReceiverSequentialTask(ReceiverTask):
         # execute next subtask
         next_subtask = ReceiverTask.instance_by_model(next_subtask_model)
         next_subtask.execute()
+
+
+def execute_task(task_id):
+    '''
+    Used to execute a task asynchronously
+    '''
+    from app import db
+    from models import Task as ModelTask
+    task_model = db.session.query(ModelTask).get(task_id)
+    task = ReceiverTask.instance_by_model(task_model)
+    task.execute()
+
+
+class ReceiverParallelTask(ReceiverTask):
+    '''
+    similar to ReceiverSequentialTask, but all subtasks are executed in
+    parallel. This task only ends when all the subtasks end.
+    '''
+
+    def __init__(self, task_model):
+        super(ReceiverParallelTask, self).__init__(task_model)
+
+    def add(self, subtask):
+        '''
+        Add a subtask. Subtasks will be executed in chronological adding order.
+
+        For subtask, supported types are:
+         * SimpleTask
+        '''
+        from app import db
+        model = subtask.create()
+        model.parent_id = self.task_model.id
+        db.session.add(model)
+        db.session.commit()
+
+    def count_unfinished_subtasks(self):
+        '''
+        Count the number of subtasks
+        '''
+        from app import db
+        from models import Task as ModelTask
+        return db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").filter(ModelTask.status != 'finished').count()
+
+    def next_subtask(self):
+        '''
+        Returns next subtask if any or None
+        '''
+        from app import db
+        from models import Task as ModelTask
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
+            filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
+
+    def execute(self):
+        '''
+        Launch the execution in parallel of all the subtasks
+        '''
+        self.do_next()
+
+    def do_next(self):
+        '''
+        After executing the task handler, this funcion is called once per each
+        subtask, and executes each subtask sequentally and in order
+        '''
+        from app import db, get_scheduler
+        from models import Task as ModelTask
+        num_unfinished_subtasks = self.count_unfinished_subtasks()
+
+        # if this is the first time do next is called and there are subtasks,
+        # let's mark this task as executing and start all the subtasks in
+        # parallel
+        if self.task_model.status == 'created' and num_unfinished_subtasks > 0:
+            # mark as executing this task
+            self.task_model.status = "executing"
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # start subtasks in parallel
+            subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
+            for subtask in subtasks:
+                get_scheduler().add_now_job(execute_task, [subtask.id])
+
+
+        # check if there's no subtask left to do, and send the do next signal
+        # for parent task if it has one
+        if num_unfinished_subtasks == 0:
+            # mark as finished
+            self.task_model.status = "finished"
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # check if there's a parent task, and if so do_next() it
+            if self.task_model.parent_id:
+                parent_model = db.session.query(ModelTask).get(self.task_model.parent_id)
+                parent_task = ReceiverTask.instance_by_model(parent_model)
+                parent_task.do_next()
 
 
 def send_message(msg_data):

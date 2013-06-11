@@ -23,7 +23,7 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from action_handlers import ActionHandlers
-from tasks import SimpleTask, SequentialTask
+from tasks import SimpleTask, SequentialTask, ParallelTask
 import decorators
 
 user_api = Blueprint('user_api', __name__)
@@ -62,8 +62,8 @@ def hello_world(task):
     from time import sleep
     sleep(5)
 
-    sequential = SequentialTask()
-    task.add(sequential)
+    parenttask = ParallelTask()
+    task.add(parenttask)
 
     subsubtask1 = SimpleTask(
         receiver_url='http://localhost:5001/api/queues',
@@ -73,17 +73,17 @@ def hello_world(task):
             'username': username*2
         }
     )
-    sequential.add(subsubtask1)
+    parenttask.add(subsubtask1)
 
     subsubtask2 = SimpleTask(
         receiver_url='http://localhost:5000/api/queues',
         action="testing.goodbye_cruel_world",
         queue="hello_world",
         data={
-            'username': username*2
+            'username': username*3
         }
     )
-    sequential.add(subsubtask2)
+    parenttask.add(subsubtask2)
 
 
     print "woke up! time to finish =)\n"
@@ -96,7 +96,7 @@ def goodbye_cruel_world(task):
     print "goodbye %s! sleeping..\n" % username
 
     from time import sleep
-    sleep(1)
+    sleep(5)
 
     print "woke up! time to finish =)\n"
     task.task_model.output_data = "goodbye %s!" % username
