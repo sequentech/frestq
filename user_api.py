@@ -23,7 +23,7 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from action_handlers import ActionHandlers
-from tasks import SimpleTask, ChordTask
+from tasks import SimpleTask, SequentialTask
 import decorators
 
 user_api = Blueprint('user_api', __name__)
@@ -45,9 +45,9 @@ def post_hello(username):
 def hello_world(task):
     '''
     complex tree of subtasks are executed:
-      hello_world (current local task :5001, chord)
+      hello_world (current local task :5001, sequential)
         |
-        |-- subchord (local virtual task :5001, chord)
+        |-- sequential (local virtual task :5001, sequential)
                |
                |-- subsubtask1/goodbye_cruel_world (local task :5001, simple)
                |
@@ -62,8 +62,8 @@ def hello_world(task):
     from time import sleep
     sleep(5)
 
-    subchord = ChordTask()
-    task.add(subchord)
+    sequential = SequentialTask()
+    task.add(sequential)
 
     subsubtask1 = SimpleTask(
         receiver_url='http://localhost:5001/api/queues',
@@ -73,7 +73,7 @@ def hello_world(task):
             'username': username*2
         }
     )
-    subchord.add(subsubtask1)
+    sequential.add(subsubtask1)
 
     subsubtask2 = SimpleTask(
         receiver_url='http://localhost:5000/api/queues',
@@ -83,7 +83,7 @@ def hello_world(task):
             'username': username*2
         }
     )
-    subchord.add(subsubtask2)
+    sequential.add(subsubtask2)
 
 
     print "woke up! time to finish =)\n"

@@ -136,11 +136,11 @@ class SimpleTask(BaseTask):
         return self.task_model
 
 
-class ChordTask(BaseTask):
+class SequentialTask(BaseTask):
     _subtasks = []
 
     def __init__(self):
-        super(ChordTask, self).__init__()
+        super(SequentialTask, self).__init__()
         self._subtasks = []
 
     def add(self, subtask):
@@ -172,7 +172,7 @@ class ChordTask(BaseTask):
 
         # create task
         task_id = str(uuid4())
-        logging.debug('CREATE local CHORD TASK with ID %s' % task_id)
+        logging.debug('CREATE local SEQUENTIAL TASK with ID %s' % task_id)
         kwargs = {
             'action': 'frestq.virtual_empty_task',
             'queue_name': 'frestq',
@@ -188,7 +188,7 @@ class ChordTask(BaseTask):
             'info_text': None,
             'id': task_id,
             'status': 'created',
-            'task_type': 'chord',
+            'task_type': 'sequential',
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
@@ -211,7 +211,7 @@ class ReceiverTask(object):
 
     # set this to true when you want to automatically finish your task and send
     # an update to sender with the finished state. This is for example set to
-    # true in ReceiverSimpleTasks but to False in ChordTasks, because chords
+    # true in ReceiverSimpleTasks but to False in SequentialTasks, because sequentials
     # send auto finish when all subtask have finished (do_next does that).
     auto_finish_after_handler = False
 
@@ -241,8 +241,8 @@ class ReceiverTask(object):
         '''
         if task_model.task_type == 'simple':
             return ReceiverSimpleTask(task_model)
-        elif task_model.task_type == 'chord':
-            return ReceiverChordTask(task_model)
+        elif task_model.task_type == 'sequential':
+            return ReceiverSequentialTask(task_model)
         else:
             raise Exception('unknown %s task type' % task_model.task_type)
 
@@ -279,7 +279,7 @@ class ReceiverSimpleTask(ReceiverTask):
         simple_task.send()
 
 
-class ReceiverChordTask(ReceiverTask):
+class ReceiverSequentialTask(ReceiverTask):
     '''
     Represents the kind of base task executed when received by a frestq node.
     You can easily add subtasks with add() method.
@@ -289,7 +289,7 @@ class ReceiverChordTask(ReceiverTask):
     '''
 
     def __init__(self, task_model):
-        super(ReceiverChordTask, self).__init__(task_model)
+        super(ReceiverSequentialTask, self).__init__(task_model)
 
     def add(self, subtask):
         '''
@@ -480,7 +480,7 @@ def post_task(msg, action_handler):
         'status': 'executing',
         'info_text': msg.info_text,
         'id': msg.task_id,
-        'task_type': 'chord'
+        'task_type': 'sequential'
     }
 
     if not kwargs['id']:
@@ -495,7 +495,7 @@ def post_task(msg, action_handler):
         task_model = ModelTask.query.get(msg.task_id)
         if task_model.task_type == 'simple':
             # this could happen if the task was created with ReceiverSimpleTask
-            task_model.task_type = 'chord'
+            task_model.task_type = 'sequential'
             db.session.add(task_model)
             db.session.commit()
     else:
@@ -517,7 +517,7 @@ def post_task(msg, action_handler):
 
     # 4. do_next the task synchronously
     #
-    # for simple task this function does nothing. For chord tasks this spawns
+    # for simple task this function does nothing. For sequential tasks this spawns
     # the next subtask (or update sender status to finished), and for parallel
     # tasks it launches all subtasks
     task.do_next()
