@@ -23,15 +23,10 @@ time tou can proceed to install it manually as when you downloaded it:
     $ git clone https://github.com/agoraciudadana/frestq && cd frestq/
 ```
 
-2. Install requirements.txt
+2. Install package and its dependencies
 
 ```
-    $ pip install -r requirements.txt
-```
-
-3. Install the frestq in the system
-```
-    $ sudo python install.py
+    $ sudo python setup.py install
 ```
 
 Tutorial
