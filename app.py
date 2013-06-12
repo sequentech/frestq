@@ -17,6 +17,7 @@
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import argparse
 from fscheduler import FScheduler
 
 from flask import Flask
@@ -64,6 +65,20 @@ def get_scheduler():
         setattr(FScheduler, "instance", FScheduler())
     return FScheduler.instance
 
-if __name__ == "__main__":
+def run_app(config_object=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--createdb", help="create the database", action="store_true")
+    args = parser.parse_args()
+    if args.createdb:
+        print "creating the database"
+        from app import db
+        db.create_all()
+        return
+
+    if config_object:
+        app.config.from_object(config_object)
     get_scheduler().start()
     app.run(threaded=True, port=app.config.get('SERVER_PORT', None), use_reloader=False)
+
+if __name__ == "__main__":
+    run_app()

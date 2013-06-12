@@ -428,7 +428,7 @@ class ReceiverSimpleTask(ReceiverTask):
         NOTE: If it has a parent task, parent_task.execute() will be called if
         needed.
 
-        NOTE: When it's a local task, it's also sent.
+        NOTE: When it's a local task, it's also sent, if hasn't been sent yet.
         '''
         if self.task_model.status == 'created':
             logging.debug('SENDING simple TASK %s' % self.task_model.id)
