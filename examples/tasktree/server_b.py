@@ -82,3 +82,6 @@ def hello_world(task):
 
     print "woke up! time to finish =)\n"
     task.task_model.output_data = "hello %s!" % username
+
+if __name__ == "__main__":
+    run_app(config_object=__name__)
