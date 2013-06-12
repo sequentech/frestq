@@ -51,7 +51,7 @@ def update_task(msg):
 
     # do next (it might be a task with a parent task)
     receiver_task = ReceiverTask.instance_by_model(task)
-    receiver_task.do_next()
+    receiver_task.execute()
 
 
 @decorators.task(action="frestq.virtual_empty_task", queue="frestq")

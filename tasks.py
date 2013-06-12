@@ -25,6 +25,20 @@ from datetime import datetime
 from flask import request
 
 class BaseTask(object):
+    '''
+    Base task to be inherited by SimpleTask, SequentialTask, etc.
+
+    It implements the public interface of a task that is going to be sent to
+    the task executer/receiver (which can be our own server or another one).
+
+    It has a constructor, and two important functions to be reimplemented:
+    create() and send(). Create() actually creates the task in the database and
+    send() sends it to the receiver.
+
+    BaseTasks differs from ReceiverTasks in that Receiver tasks are those being
+    executed by a receiver, and because of this they're constructed differently
+    and have a different set of methods.
+    '''
     task_model = None
 
     def __init__(self):
@@ -66,6 +80,20 @@ class BaseTask(object):
         send_message(msg_data)
 
 class SimpleTask(BaseTask):
+    '''
+    Simple task instances are the only kind of tasks that will be actually sent
+    to a receiver machine. This receiver might be the same as the sender.
+
+    A simple task is sent to an action handler in a specific queue of a
+    receiving server.
+
+    It's worth noting that the sender server sees a simple task as only one
+    single item, but the receiving server sees it *always* as a sequential task.
+    This way the action handler can attach a tree of subtasks to decompose the
+    work to do in a way that is transparent to the sender. Because of this
+    reason, there's no ReceiverSimpleTask implementation, because it's not
+    needed.
+    '''
     receiver_url = None
     action = None
     queue = None
@@ -77,6 +105,13 @@ class SimpleTask(BaseTask):
 
     def __init__(self, receiver_url, action, queue, data=None, async_data=None,
             info_text=None, pingback_date=None, expiration_date=None):
+        '''
+        Constructor of a simple tasks. It takes as input all the information
+        needed to send the single task to the receiver end.
+
+        Note: to save the task in the database of the sender you need to call
+        to create(), and to send it to the receiver, call to send().
+        '''
         super(SimpleTask, self).__init__()
         self.receiver_url = receiver_url
         self.action = action
@@ -88,7 +123,7 @@ class SimpleTask(BaseTask):
         self.pingback_date = pingback_date
 
     @classmethod
-    def create_from_model(cls, task_model):
+    def _create_from_model(cls, task_model):
         ret = cls(
             receiver_url=task_model.receiver_url,
             action=task_model.action,
@@ -97,13 +132,13 @@ class SimpleTask(BaseTask):
             async_data=task_model.input_async_data,
             pingback_date=task_model.pingback_date,
             expiration_date=task_model.expiration_date
-        )
+       )
         ret.task_model = task_model
         return ret
 
     def create(self):
         '''
-        Create the task in the DB and returns the model
+        Create the simple task in the DB and returns the model.
         '''
         from app import db, app
         from models import Task as ModelTask, Message as ModelMessage
@@ -137,35 +172,60 @@ class SimpleTask(BaseTask):
 
 
 class SequentialTask(BaseTask):
+    '''
+    A sequential task executes a list of subtasks in order one after the other.
+    This kind of task is "virtual" (as ParallelTask also is, for example). This
+    means that:
+     * it is a container task, which is always executed in the sender and thus
+       it has no receiver
+     * it has no specific action handler, process and returns no data by itself
+
+    To add subtasks, call to add(). This can be done before or after this task
+    has been created in the database, but it needs to be created to be executed
+    properly.
+
+    NOTE: When you send a SimpleTask to a receiver, the receiver sees it as a
+    ReceiverSequentialTask.
+    '''
     _subtasks = []
 
     def __init__(self):
+        '''
+        Constructor. Takes no arguments.
+        '''
         super(SequentialTask, self).__init__()
         self._subtasks = []
 
     def add(self, subtask):
+        '''
+        Adds a subtask to this sequential task, making this one its parent. The
+        task is added to be executed after all previously added subtasks.
+        '''
         if not self.task_model:
             self._subtasks.append(subtask)
             return
 
         from app import db
         model = subtask.create()
-        model.order = self.count_subtasks()
+        model.order = self._count_subtasks()
         model.parent_id = self.task_model.id
         db.session.add(model)
         db.session.commit()
 
-    def count_subtasks(self):
+    def _count_subtasks(self):
         '''
-        Count the number of subtasks
+        Internal. Count the number of subtasks. Only meant to be executed after
+        the sequential task has been created in the database.
         '''
         from app import db
         from models import Task as ModelTask
-        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").count()
+        return db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").count()
 
     def create(self):
         '''
-        Create the task in the DB and returns the model
+        Create the task in the DB and returns the model. It also creates all the
+        subtasks if they have not been created.
         '''
         from app import db, app
         from models import Task as ModelTask, Message as ModelMessage
@@ -206,13 +266,22 @@ class SequentialTask(BaseTask):
 
 
 class ParallelTask(BaseTask):
+    '''
+    Very similar to SequentialTask, but will execute all subtasks in parallel.
+    '''
     _subtasks = []
 
     def __init__(self):
+        '''
+        Constructor, takes no arguments as it is a virtual task.
+        '''
         super(ParallelTask, self).__init__()
         self._subtasks = []
 
     def add(self, subtask):
+        '''
+        Adds a subtask.
+        '''
         if not self.task_model:
             self._subtasks.append(subtask)
             return
@@ -225,7 +294,8 @@ class ParallelTask(BaseTask):
 
     def create(self):
         '''
-        Create the task in the DB and returns the model
+        Create the task in the DB and returns the model, creating any previously
+        added subtasks.
         '''
         from app import db, app
         from models import Task as ModelTask, Message as ModelMessage
@@ -265,13 +335,14 @@ class ParallelTask(BaseTask):
 
 
 class ReceiverTask(object):
+    '''
+    Base class used for executing task being received in a frestq server.
+    '''
     # set this to true to send an update to the sender
     send_update_to_sender = False
 
     # set this to true when you want to automatically finish your task and send
-    # an update to sender with the finished state. This is for example set to
-    # true in ReceiverSimpleTasks but to False in SequentialTasks, because sequentials
-    # send auto finish when all subtask have finished (do_next does that).
+    # an update to sender with the finished state.
     auto_finish_after_handler = False
 
     # reference to the task model
@@ -279,19 +350,6 @@ class ReceiverTask(object):
 
     def __init__(self, task_model):
         self.task_model = task_model
-
-    def do_next(self):
-        '''
-        Function that gets executed after a task's action handler has been
-        executed.
-        '''
-        from app import db
-        from models import Task as ModelTask
-        # check if there's a parent task, and if so do_next() it
-        if self.task_model.parent_id:
-            parent = db.session.query(ModelTask).get(self.task_model.parent_id)
-            parent_task = ReceiverTask.instance_by_model(parent)
-            parent_task.do_next()
 
     @staticmethod
     def instance_by_model(task_model):
@@ -309,14 +367,49 @@ class ReceiverTask(object):
 
     def execute(self):
         '''
-        executes the task, sending it if it needed to the appropiate party.
+        Function that gets executed after a task's action handler has been
+        executed.
+
+        Handles the finalization of the execution of the task, sending it if it
+        needed to the appropiate party. This function might be called multiple
+        times until the task is finished, so internally it should detect what to
+        do in each case.
+
+        For example, in ReceiverSequentialTask, it's called after each subtask
+        is completed.
         '''
         pass
+
+    def execute_parent(self):
+        '''
+        Executes parent task if there's any.
+        '''
+        from app import db
+        from models import Task as ModelTask
+        # check if there's a parent task, and if so execute() it
+        if not self.task_model.parent_id:
+            return
+
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent_task = ReceiverTask.instance_by_model(parent)
+        parent_task.execute()
 
 
 class ReceiverSimpleTask(ReceiverTask):
     '''
-    Represents a simple task
+    Represents a simple task when being about to be executed in the receiver.
+
+    Because simple tasks are converted into sequential tasks in the receiver,
+    one would think that this task should not exist (because in the receiver
+    the task would be instanced as ReceiverSequentialTask).
+
+    But this is not true because in virtual receiver tasks
+    (ReceiverSequentialTask for example), their execute() function instantiate
+    the receiver class for each subtask and call to execute each of them. This
+    is done instead of sending each subtask because some of those subtasks
+    can be virtual and thus cannot be sent, so what we do is that the execute
+    function of ReceiverSimpleTask sends the task to the receiver (and then
+    the task will be instantiated as a ReceiverSequentialTask).
     '''
     auto_finish_after_handler = True
 
@@ -329,15 +422,20 @@ class ReceiverSimpleTask(ReceiverTask):
         '''
         Executes the task, sending it to the party that needs to execute.
         This will trigger the call to the appropiate action handler for this
-        task in the party receiving the task.
+        task in the party receiving the task. See the class description for
+        more details behind this behaviour.
 
-        NOTE: If it has a parent task, parent_task.do_next() will be called if
+        NOTE: If it has a parent task, parent_task.execute() will be called if
         needed.
 
         NOTE: When it's a local task, it's also sent.
         '''
-        simple_task = SimpleTask.create_from_model(self.task_model)
-        simple_task.send()
+        if self.task_model.status == 'created':
+            logging.debug('SENDING simple TASK %s' % self.task_model.id)
+            simple_task = SimpleTask._create_from_model(self.task_model)
+            simple_task.send()
+        elif self.task_model.status == "finished":
+            self.execute_parent()
 
 
 class ReceiverSequentialTask(ReceiverTask):
@@ -346,7 +444,7 @@ class ReceiverSequentialTask(ReceiverTask):
     You can easily add subtasks with add() method. Each subtask are executed
     sequentially and in order.
 
-    Subtasks will begin to be processed asynchronously when do_next() function
+    Subtasks will begin to be processed asynchronously when execute() function
     is called.
     '''
 
@@ -362,12 +460,12 @@ class ReceiverSequentialTask(ReceiverTask):
         '''
         from app import db
         model = subtask.create()
-        model.order = self.count_subtasks()
+        model.order = self._count_subtasks()
         model.parent_id = self.task_model.id
         db.session.add(model)
         db.session.commit()
 
-    def count_subtasks(self):
+    def _count_subtasks(self):
         '''
         Count the number of subtasks
         '''
@@ -385,12 +483,6 @@ class ReceiverSequentialTask(ReceiverTask):
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
     def execute(self):
-        '''
-
-        '''
-        self.do_next()
-
-    def do_next(self):
         '''
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
@@ -413,11 +505,8 @@ class ReceiverSequentialTask(ReceiverTask):
                 get_scheduler().add_now_job(send_task_update, [self.task_model.id])
 
 
-            # check if there's a parent task, and if so do_next() it
-            if self.task_model.parent_id:
-                parent_model = db.session.query(ModelTask).get(self.task_model.parent_id)
-                parent_task = ReceiverTask.instance_by_model(parent_model)
-                parent_task.do_next()
+            # check if there's a parent task, and if so execute() it
+            self.execute_parent()
             return
 
         if next_subtask_model.status in ['sent', 'executing', 'error']:
@@ -441,7 +530,7 @@ def execute_task(task_id):
 
 class ReceiverParallelTask(ReceiverTask):
     '''
-    similar to ReceiverSequentialTask, but all subtasks are executed in
+    Similar to ReceiverSequentialTask, but all subtasks are executed in
     parallel. This task only ends when all the subtasks end.
     '''
 
@@ -481,12 +570,6 @@ class ReceiverParallelTask(ReceiverTask):
 
     def execute(self):
         '''
-        Launch the execution in parallel of all the subtasks
-        '''
-        self.do_next()
-
-    def do_next(self):
-        '''
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
         '''
@@ -517,11 +600,8 @@ class ReceiverParallelTask(ReceiverTask):
             db.session.add(self.task_model)
             db.session.commit()
 
-            # check if there's a parent task, and if so do_next() it
-            if self.task_model.parent_id:
-                parent_model = db.session.query(ModelTask).get(self.task_model.parent_id)
-                parent_task = ReceiverTask.instance_by_model(parent_model)
-                parent_task.do_next()
+            # check if there's a parent task, and if so execute() it
+            self.execute_parent()
 
 
 def send_message(msg_data):
@@ -609,11 +689,11 @@ def send_task_update(task_id):
     db.session.add(task)
     db.session.commit()
 
-    # task finished. check if there's a parent task, and if so do_next() it
+    # task finished. check if there's a parent task, and if so execute() it
     if task.parent_id:
         parent = db.session.query(ModelTask).get(task.parent_id)
         parent_task = ReceiverTask.instance_by_model(parent)
-        parent_task.do_next()
+        parent_task.execute()
 
 def post_task(msg, action_handler):
     '''
@@ -656,7 +736,7 @@ def post_task(msg, action_handler):
     if is_local:
         task_model = ModelTask.query.get(msg.task_id)
         if task_model.task_type == 'simple':
-            # this could happen if the task was created with ReceiverSimpleTask
+            # this could happen if the task was created with SimpleTask
             task_model.task_type = 'sequential'
             db.session.add(task_model)
             db.session.commit()
@@ -677,9 +757,9 @@ def post_task(msg, action_handler):
     if task.send_update_to_sender:
         get_scheduler().add_now_job(send_task_update, [task_model.id])
 
-    # 4. do_next the task synchronously
+    # 4. execute the task synchronously
     #
     # for simple task this function does nothing. For sequential tasks this spawns
     # the next subtask (or update sender status to finished), and for parallel
     # tasks it launches all subtasks
-    task.do_next()
+    task.execute()
