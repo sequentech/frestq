@@ -13,18 +13,25 @@ Protocol (RESTQP) for communication of tasks and updates between any two peers.
 Installation
 ------------
 
-The easiest way to install frestq is to do "pip install frestq".  You can also
-install it manually if you downloaded it:
+The easiest way to install latest stable version of frestq will be to do
+"pip install frestq".  However, there's no stable version yet, so in the mean
+time tou can proceed to install it manually as when you downloaded it:
 
-1. Install requirements.txt
+1. Download from the git repository if you haven't got a copy
+
+```
+    $ git clone https://github.com/agoraciudadana/frestq && cd frestq/
+```
+
+2. Install requirements.txt
 
 ```
     $ pip install -r requirements.txt
 ```
 
-2. Install the frestq in the system
+3. Install the frestq in the system
 ```
-    $ sudo ./install.py
+    $ sudo python install.py
 ```
 
 Tutorial
@@ -42,15 +49,15 @@ configure port 5001.
 First let's see an overall description of how our frestq based service will
 work:
 
-    1. user calls to POST http://localhost:5000/say/hello/<username> in server
-       A.
-    2. flask view in /say/<message> creates a simple task "hello_world" in queue
-      "say_queue" to be executed in server B.
-    3. server B receives the "say_hello" task, which is executed by an action
-      handler.
-    4. After the execution of the action handler, server B sends a "finished"
-       status update notification to server A, along with the tasks results, if
-       any.
+ 1. user calls to POST http://localhost:5000/say/hello/<username> in server
+ A.
+ 2. flask view in /say/<message> creates a simple task "hello_world" in queue
+ "say_queue" to be executed in server B.
+ 3. server B receives the "say_hello" task, which is executed by an action
+ handler.
+ 4. After the execution of the action handler, server B sends a "finished"
+ status update notification to server A, along with the tasks results, if
+ any.
 
 So some notes and observations about this:
  * In frestq, the standard way to launch a task is to launch it within a flask
@@ -89,6 +96,7 @@ So some notes and observations about this:
 The code of server_a.py is this:
 
 ```
+#!/usr/bin/env python
 from flask import Blueprint, make_response
 
 from frestq.tasks import SimpleTask
@@ -109,7 +117,7 @@ def post_hello(username):
     task.create_and_send()
     return make_response("", 200)
 
-app.register_blueprint(say_api)
+app.register_blueprint(say_api, url_prefix='/say')
 
 if __name__ == "__main__":
     run_app()
@@ -122,6 +130,7 @@ corresponds with the ROOT_URL of server B.
 The code server_b.py is:
 
 ```
+#!/usr/bin/env python
 from frestq import decorators
 from frestq.app import app, run_app
 
@@ -153,19 +162,23 @@ if __name__ == "__main__":
     run_app(config_object=__name__)
 ```
 
+Note that we use task.task_model to get input data and set output data. Output
+data will be sent back to server A transparently after the hello_world function
+is executed.
+
 You can create each of these two files in the same folder "example/". Asuming
-you have already installed frestq requirements (see Step 1 of Install
-procedure), you can create the db of both servers this way:
+you have already installed frestq, you can create the db of both servers this
+way:
 
 ```
-    $ ./server_a.py --createdb
-    $ ./server_b.py --createdb
+    $ python server_a.py --createdb
+    $ python server_b.py --createdb
 ```
 
 To launch each server, **run in different terminals** the following two commands:
 
 ```
-    $ ./server_a.py
+    $ python server_a.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5000/
@@ -175,7 +188,7 @@ To launch each server, **run in different terminals** the following two commands
 
 
 ```
-    $ ./server_b.py
+    $ python server_b.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5001/
@@ -187,6 +200,6 @@ And to launch the hello job, execute in another **new third terminal** the
 following command:
 
 ```
-    $ curl -X POST http://localhost:5000/say/hello/richard.stallman --header "Content-Type:application/json"
+    $ curl -X POST http://127.0.0.1:5000/say/hello/richard.stallman
 ```
 

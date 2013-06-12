@@ -2,3 +2,7 @@
 *.kdev4
 *.pyc
 custom_settings.py
+frestq.egg-info/
+MANIFEST
+build/
+dist/
