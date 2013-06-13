@@ -36,6 +36,9 @@ In this simple hello world in frestq, you will need two running frestq server
 instances. This due to the fact that frestq is based on the asumption that all
 communication is between two peers.
 
+Note: if you want, you can find the example code of this tutorial in
+examples/helloworld.
+
 So, you will have launch two different shell sessions. In one of them we will
 execute a frestq http server in http://127.0.0.1:5000/ and the other in port
 5001. For server A we will just use default settings, but for server B we will
@@ -97,6 +100,11 @@ from flask import Blueprint, make_response
 from frestq.tasks import SimpleTask
 from frestq.app import app, run_app
 
+# set database uri
+import os
+ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db.sqlite' % ROOT_PATH
+
 say_api = Blueprint('say', __name__)
 
 @say_api.route('/hello/<username>', methods=['POST'])
@@ -131,7 +139,10 @@ from frestq.app import app, run_app
 
 # configuration:
 
-SQLALCHEMY_DATABASE_URI = 'sqlite:///db2.sqlite'
+# set database uri
+import os
+ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
 SERVER_NAME = 'localhost:5001'
 

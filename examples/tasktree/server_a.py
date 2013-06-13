@@ -23,6 +23,11 @@ from frestq.app import app, run_app
 
 import common
 
+# set database uri
+import os
+ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db.sqlite' % ROOT_PATH
+
 say_api = Blueprint('say', __name__)
 
 @say_api.route('/hello/<username>', methods=['POST'])

@@ -41,24 +41,16 @@ SSL_CERT_STRING = ''
 # queues root url
 ROOT_URL = 'http://localhost:5000/api/queues'
 
-# import custom settings if any
-try:
-    from custom_settings import *
-except:
-    pass
-
 # boostrap our little application
 app.config.from_object(__name__)
 app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
 db = SQLAlchemy(app)
-import models
+from . import models
 
-from api import api
-from user_api import *
+from .api import api
 app.register_blueprint(api, url_prefix='/api')
-app.register_blueprint(user_api, url_prefix='/user')
 
-from protocol import *
+from . import protocol
 
 def get_scheduler():
     if not hasattr(FScheduler, "instance"):
@@ -69,14 +61,13 @@ def run_app(config_object=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--createdb", help="create the database", action="store_true")
     args = parser.parse_args()
+    if config_object:
+        app.config.from_object(config_object)
     if args.createdb:
         print "creating the database"
-        from app import db
         db.create_all()
         return
 
-    if config_object:
-        app.config.from_object(config_object)
     get_scheduler().start()
     app.run(threaded=True, port=app.config.get('SERVER_PORT', None), use_reloader=False)
 

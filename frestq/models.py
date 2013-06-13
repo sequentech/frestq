@@ -24,7 +24,7 @@ from sqlalchemy.types import TypeDecorator, VARCHAR
 from flask import Flask, jsonify
 from flask.ext.sqlalchemy import SQLAlchemy
 
-from app import db
+from .app import db
 
 
 class JSONEncodedDict(TypeDecorator):

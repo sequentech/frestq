@@ -21,7 +21,10 @@ from frestq.app import app, run_app
 
 # configuration:
 
-SQLALCHEMY_DATABASE_URI = 'sqlite:///db2.sqlite'
+# set database uri
+import os
+ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
 SERVER_NAME = 'localhost:5001'
 

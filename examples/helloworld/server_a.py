@@ -21,6 +21,11 @@ from flask import Blueprint, make_response
 from frestq.tasks import SimpleTask
 from frestq.app import app, run_app
 
+# set database uri
+import os
+ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db.sqlite' % ROOT_PATH
+
 say_api = Blueprint('say', __name__)
 
 @say_api.route('/hello/<username>', methods=['POST'])
@@ -39,4 +44,4 @@ def post_hello(username):
 app.register_blueprint(say_api, url_prefix='/say')
 
 if __name__ == "__main__":
-    run_app()
+    run_app(config_object=__name__)

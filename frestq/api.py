@@ -23,8 +23,8 @@ from datetime import datetime
 from flask import Blueprint, request, make_response
 from flask import current_app
 
-from action_handlers import ActionHandlers
-from tasks import post_task
+from .action_handlers import ActionHandlers
+from .tasks import post_task
 
 api = Blueprint('api', __name__)
 
@@ -41,7 +41,7 @@ def call_action_handler(msg_id, queue_name):
     '''
     Calls asynchronously to the action handler
     '''
-    from models import Message
+    from .models import Message
     logging.debug('EXEC ACTION handler for MESSAGE id %s (QUEUE %s)' % (
         msg_id, queue_name))
     msg = Message.query.get(msg_id)
@@ -61,8 +61,8 @@ def post_message(queue_name):
     '''
     # 1. register message in the db model
 
-    from app import db, get_scheduler
-    from models import Message
+    from .app import db, get_scheduler
+    from .models import Message
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
     try:
         data = json.loads(request.data)

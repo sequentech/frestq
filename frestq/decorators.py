@@ -17,7 +17,8 @@
 # along with election-orchestra.  If not, see <http://www.gnu.org/licenses/>.
 
 from functools import wraps
-from action_handlers import ActionHandlers
+
+from .action_handlers import ActionHandlers
 
 def message_action(action, queue, **kwargs):
     """

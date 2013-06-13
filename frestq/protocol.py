@@ -22,14 +22,14 @@ import logging
 
 from flask import Blueprint, request, make_response
 
-from action_handlers import ActionHandlers
-import decorators
+from .action_handlers import ActionHandlers
+from . import decorators
 
 @decorators.message_action(action="frestq.update_task", queue="frestq")
 def update_task(msg):
-    from app import db
-    from models import Task as ModelTask
-    from tasks import ReceiverTask
+    from .app import db
+    from .models import Task as ModelTask
+    from .tasks import ReceiverTask
 
     task = msg.task
     logging.debug("UPDATING TASK with id %s" % task.id)
