@@ -47,7 +47,7 @@ configure port 5001.
 First let's see an overall description of how our frestq based service will
 work:
 
- 1. user calls to POST http://localhost:5000/say/hello/<username> in server
+ 1. user calls to POST http://127.0.0.1:5000/say/hello/<username> in server
  A.
  2. flask view in /say/<message> creates a simple task "hello_world" in queue
  "say_queue" to be executed in server B.
@@ -87,7 +87,7 @@ So some notes and observations about this:
    task.
 
  * Because everything is executed asynchronously, the initial
-   POST http://localhost:5000/say/hello/<username> call is executed also in this
+   POST http://127.0.0.1:5000/say/hello/<username> call is executed also in this
    manner. The task is created, sent, and then the flask view returns without
    waiting for the task to finish.
 
@@ -110,7 +110,7 @@ say_api = Blueprint('say', __name__)
 @say_api.route('/hello/<username>', methods=['POST'])
 def post_hello(username):
     task = SimpleTask(
-        receiver_url='http://localhost:5001/api/queues',
+        receiver_url='http://127.0.0.1:5001/api/queues',
         action="hello_world",
         queue="say_queue",
         data={
@@ -144,11 +144,11 @@ import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
 SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
-SERVER_NAME = 'localhost:5001'
+SERVER_NAME = '127.0.0.1:5001'
 
 SERVER_PORT = 5001
 
-ROOT_URL = 'http://localhost:5001/api/queues'
+ROOT_URL = 'http://127.0.0.1:5001/api/queues'
 
 
 # action handler:
