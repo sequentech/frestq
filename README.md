@@ -209,3 +209,13 @@ following command:
     $ curl -X POST http://127.0.0.1:5000/say/hello/richard.stallman
 ```
 
+Unfortunately we don't have yet an easy way to know the status of tasks, but if
+everything went right, you'll be able to see the following lines at the end of
+the output in the shell running server A:
+
+```
+    DEBUG:root:SETTING TASK FIELD 'output_data' to 'hello richard.stallman!'
+    DEBUG:root:SETTING TASK FIELD 'status' to 'finished'
+    INFO:apscheduler.scheduler:Job "call_action_handler (trigger: now, next run at: None)" executed successfully
+    DEBUG:apscheduler.threadpool:Exiting worker thread
+```
