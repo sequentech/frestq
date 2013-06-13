@@ -123,7 +123,7 @@ def post_hello(username):
 app.register_blueprint(say_api, url_prefix='/say')
 
 if __name__ == "__main__":
-    run_app()
+    run_app(config_object=__name__)
 ```
 
 The post_hello is the flask view that initiates the frestq task. This code will
