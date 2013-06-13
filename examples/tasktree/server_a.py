@@ -21,7 +21,7 @@ from flask import Blueprint, make_response
 from frestq.tasks import SimpleTask
 from frestq.app import app, run_app
 
-import common
+from common import goodbye_cruel_world
 
 # set database uri
 import os
@@ -33,9 +33,9 @@ say_api = Blueprint('say', __name__)
 @say_api.route('/hello/<username>', methods=['POST'])
 def post_hello(username):
     task = SimpleTask(
-        receiver_url='http://localhost:5001/api/queues',
-        action="hello_world",
-        queue="say_queue",
+        receiver_url='http://127.0.0.1:5001/api/queues',
+        action="testing.hello_world",
+        queue="hello_world",
         data={
             'username': username
         }
@@ -46,4 +46,4 @@ def post_hello(username):
 app.register_blueprint(say_api, url_prefix='/say')
 
 if __name__ == "__main__":
-    run_app()
+    run_app(config_object=__name__)

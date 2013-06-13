@@ -31,7 +31,7 @@ say_api = Blueprint('say', __name__)
 @say_api.route('/hello/<username>', methods=['POST'])
 def post_hello(username):
     task = SimpleTask(
-        receiver_url='http://localhost:5001/api/queues',
+        receiver_url='http://127.0.0.1:5001/api/queues',
         action="hello_world",
         queue="say_queue",
         data={

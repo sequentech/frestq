@@ -19,6 +19,7 @@ from __future__ import unicode_literals
 import requests
 import logging
 import json
+import copy
 from uuid import uuid4
 from datetime import datetime
 
@@ -41,6 +42,8 @@ class BaseTask(object):
     '''
     task_model = None
 
+    label = ""
+
     def __init__(self):
         super(BaseTask, self).__init__()
         pass
@@ -55,7 +58,7 @@ class BaseTask(object):
         '''
         Create the task in the DB and sends the task to the receiver
         '''
-        task = self.create()
+        self.task_model = self.create()
         self.send()
 
     def send(self):
@@ -78,6 +81,129 @@ class BaseTask(object):
         db.session.commit()
 
         send_message(msg_data)
+
+    def get_data(self):
+        '''
+        Returns public task data available to the user
+        '''
+        return copy.deepcopy(self.task_model.to_dict())
+
+    @staticmethod
+    def instance_by_model(task_model):
+        '''
+        This is a factory pattern
+        '''
+        if task_model.task_type == 'simple':
+            return SimpleTask._create_from_model(task_model)
+        elif task_model.task_type == 'sequential':
+            return SequentialTask._create_from_model(task_model)
+        elif task_model.task_type == 'parallel':
+            return ParallelTask._create_from_model(task_model)
+        else:
+            raise Exception('unknown %s task type' % task_model.task_type)
+
+
+    def get_children(self):
+        '''
+        Returns the ordered list of children of this task if any
+        '''
+        from .app import db
+        from .models import Task as ModelTask
+        subtasks = db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").order_by(ModelTask.order)
+
+        children_tasks = [BaseTask.instance_by_model(task)
+            for task in subtasks]
+        return children_tasks
+
+    def get_child(self, label):
+        '''
+        Gets a children by label
+        '''
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").filter(ModelTask.label == label).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
+    def get_parent(self):
+        '''
+        Returns the parent BaseTask
+        '''
+        # check if there's a parent task, and if so execute() it
+        if not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent_task = BaseTask.instance_by_model(parent)
+        return parent_task
+
+    def get_siblings(self):
+        '''
+        Returns the list of siblings of this task if any
+        '''
+        if not self.task_model.parent_id:
+            return []
+
+        from .app import db
+        from .models import Task as ModelTask
+        siblings = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id)\
+            .exclude(ModelTask.id == self.task_model.id)\
+            .order_by(ModelTask.order)
+
+        return [BaseTask.instance_by_model(task)
+            for task in siblings]
+
+    def get_sibling(self, label):
+        '''
+        Gets a children by label
+        '''
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask).filter(
+            ModelTask.id == self.task_model.parent_id,
+            ModelTask.label == label).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
+    def get_prev(self):
+        '''
+        Get previous sibling if any
+        '''
+        if self.task_model.order == 0 or not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id,
+                ModelTask.order == self.task_model.order - 1).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
+    def get_next(self):
+        '''
+        Get previous sibling if any
+        '''
+        if not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id,
+                ModelTask.order == self.task_model.order + 1).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
 
 class SimpleTask(BaseTask):
     '''
@@ -103,8 +229,9 @@ class SimpleTask(BaseTask):
     expiration_date = None
     pingback_date = None
 
-    def __init__(self, receiver_url, action, queue, data=None, async_data=None,
-            info_text=None, pingback_date=None, expiration_date=None):
+    def __init__(self, receiver_url, action, queue, data=None, label=None,
+            async_data=None, info_text=None, pingback_date=None,
+            expiration_date=None):
         '''
         Constructor of a simple tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -113,6 +240,7 @@ class SimpleTask(BaseTask):
         to create(), and to send it to the receiver, call to send().
         '''
         super(SimpleTask, self).__init__()
+        self.label = label
         self.receiver_url = receiver_url
         self.action = action
         self.data = data
@@ -131,7 +259,8 @@ class SimpleTask(BaseTask):
             data=task_model.input_data,
             async_data=task_model.input_async_data,
             pingback_date=task_model.pingback_date,
-            expiration_date=task_model.expiration_date
+            expiration_date=task_model.expiration_date,
+            label=task_model.label
        )
         ret.task_model = task_model
         return ret
@@ -150,6 +279,7 @@ class SimpleTask(BaseTask):
         kwargs = {
             'action': self.action,
             'queue_name': self.queue,
+            'label': self.label,
             'sender_url': app.config.get('ROOT_URL'),
             'receiver_url': self.receiver_url,
             'is_received': False,
@@ -189,12 +319,19 @@ class SequentialTask(BaseTask):
     '''
     _subtasks = []
 
-    def __init__(self):
+    def __init__(self, label=""):
         '''
         Constructor. Takes no arguments.
         '''
         super(SequentialTask, self).__init__()
         self._subtasks = []
+        self.label = label
+
+    @classmethod
+    def _create_from_model(cls, task_model):
+        ret = cls()
+        ret.task_model = task_model
+        return ret
 
     def add(self, subtask):
         '''
@@ -236,6 +373,7 @@ class SequentialTask(BaseTask):
         kwargs = {
             'action': 'frestq.virtual_empty_task',
             'queue_name': 'frestq',
+            'label': self.label,
             'sender_url': app.config.get('ROOT_URL'),
             'receiver_url': app.config.get('ROOT_URL'),
             'is_received': False,
@@ -271,12 +409,19 @@ class ParallelTask(BaseTask):
     '''
     _subtasks = []
 
-    def __init__(self):
+    def __init__(self, label=""):
         '''
         Constructor, takes no arguments as it is a virtual task.
         '''
         super(ParallelTask, self).__init__()
         self._subtasks = []
+        self.label = label
+
+    @classmethod
+    def _create_from_model(cls, task_model):
+        ret = cls()
+        ret.task_model = task_model
+        return ret
 
     def add(self, subtask):
         '''
@@ -306,6 +451,7 @@ class ParallelTask(BaseTask):
         kwargs = {
             'action': 'frestq.virtual_empty_task',
             'queue_name': 'frestq',
+            'label': self.label,
             'sender_url': app.config.get('ROOT_URL'),
             'receiver_url': app.config.get('ROOT_URL'),
             'is_received': False,
@@ -393,6 +539,82 @@ class ReceiverTask(object):
         parent = db.session.query(ModelTask).get(self.task_model.parent_id)
         parent_task = ReceiverTask.instance_by_model(parent)
         parent_task.execute()
+
+    def get_parent(self):
+        '''
+        Returns the parent BaseTask
+        '''
+        # check if there's a parent task, and if so execute() it
+        if not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent_task = BaseTask.instance_by_model(parent)
+        return parent_task
+
+    def get_siblings(self):
+        '''
+        Returns the list of siblings of this task if any
+        '''
+        if not self.task_model.parent_id:
+            return []
+
+        from .app import db
+        from .models import Task as ModelTask
+        siblings = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id)\
+            .exclude(ModelTask.id == self.task_model.id)\
+            .order_by(ModelTask.order)
+
+        return [BaseTask.instance_by_model(task)
+            for task in siblings]
+
+    def get_sibling(self, label):
+        '''
+        Gets a children by label
+        '''
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask).filter(
+            ModelTask.id == self.task_model.parent_id,
+            ModelTask.label == label).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
+    def get_prev(self):
+        '''
+        Get previous sibling if any
+        '''
+        if self.task_model.order == 0 or not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id,
+                ModelTask.order == self.task_model.order - 1).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
+
+    def get_next(self):
+        '''
+        Get previous sibling if any
+        '''
+        if not self.task_model.parent_id:
+            return None
+
+        from .app import db
+        from .models import Task as ModelTask
+        task = db.session.query(ModelTask)\
+            .filter(ModelTask.id == self.task_model.parent_id,
+                ModelTask.order == self.task_model.order + 1).first()
+        if not task:
+            return None
+        return BaseTask.instance_by_model(task)
 
 
 class ReceiverSimpleTask(ReceiverTask):

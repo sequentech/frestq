@@ -132,6 +132,8 @@ class Task(db.Model):
     # for example used in synchronous tasks to store the algorithm
     task_metadata = db.Column(JSONEncodedDict)
 
+    label = db.Column(db.Unicode(1024))
+
     action = db.Column(db.Unicode(1024))
 
     queue_name = db.Column(db.Unicode(1024))
@@ -195,6 +197,7 @@ class Task(db.Model):
         ret = {
             'id': self.id,
             'action': self.action,
+            'label': self.label,
             'queue_name': self.queue_name,
             'status': self.status,
             'order': self.order,

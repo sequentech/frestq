@@ -20,7 +20,7 @@ from frestq import decorators
 from frestq.app import app, run_app
 from frestq.tasks import SimpleTask, ParallelTask
 
-import common
+from common import goodbye_cruel_world
 
 # configuration:
 
@@ -29,11 +29,11 @@ import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
 SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
-SERVER_NAME = 'localhost:5001'
+SERVER_NAME = '127.0.0.1:5001'
 
 SERVER_PORT = 5001
 
-ROOT_URL = 'http://localhost:5001/api/queues'
+ROOT_URL = 'http://127.0.0.1:5001/api/queues'
 
 
 # action handler:
@@ -54,16 +54,17 @@ def hello_world(task):
     is notified that the initial task is finished.
     '''
     username = task.task_model.input_data['username']
-    print "hello %s! sleeping..\n" % username
 
     from time import sleep
+    print "hello %s! sleeping..\n" % username
     sleep(5)
+    print "woke up! time to finish =)\n"
 
     subtask = ParallelTask()
     task.add(subtask)
 
     subsubtask1 = SimpleTask(
-        receiver_url='http://localhost:5001/api/queues',
+        receiver_url='http://127.0.0.1:5001/api/queues',
         action="testing.goodbye_cruel_world",
         queue="hello_world",
         data={
@@ -73,7 +74,7 @@ def hello_world(task):
     subtask.add(subsubtask1)
 
     subsubtask2 = SimpleTask(
-        receiver_url='http://localhost:5000/api/queues',
+        receiver_url='http://127.0.0.1:5000/api/queues',
         action="testing.goodbye_cruel_world",
         queue="hello_world",
         data={
@@ -82,9 +83,19 @@ def hello_world(task):
     )
     subtask.add(subsubtask2)
 
+    subtask2 = SimpleTask(
+        receiver_url='http://127.0.0.1:5001/api/queues',
+        action="testing.all_goodbyes_together",
+        queue="hello_world",
+    )
+    task.add(subtask2)
 
-    print "woke up! time to finish =)\n"
     task.task_model.output_data = "hello %s!" % username
+
+
+@decorators.task(action="testing.all_goodbyes_together", queue="hello_world")
+def all_goodbyes_together(task):
+    print "TODO"
 
 if __name__ == "__main__":
     run_app(config_object=__name__)

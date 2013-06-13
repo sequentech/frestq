@@ -26,11 +26,11 @@ import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
 SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
-SERVER_NAME = 'localhost:5001'
+SERVER_NAME = '127.0.0.1:5001'
 
 SERVER_PORT = 5001
 
-ROOT_URL = 'http://localhost:5001/api/queues'
+ROOT_URL = 'http://127.0.0.1:5001/api/queues'
 
 
 # action handler:

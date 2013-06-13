@@ -63,6 +63,7 @@ def post_message(queue_name):
 
     from .app import db, get_scheduler
     from .models import Message
+
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
     try:
         data = json.loads(request.data)
