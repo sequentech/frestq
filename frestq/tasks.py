@@ -25,6 +25,9 @@ from datetime import datetime
 
 from flask import request
 
+from .app import db, app, get_scheduler
+from .models import Task as ModelTask, Message as ModelMessage
+
 class BaseTask(object):
     '''
     Base task to be inherited by SimpleTask, SequentialTask, etc.
@@ -63,7 +66,6 @@ class BaseTask(object):
 
     def send(self):
         # send task
-        from .app import app, db
         msg_data = {
             'action': self.task_model.action,
             'queue_name': self.task_model.queue_name,
@@ -107,8 +109,6 @@ class BaseTask(object):
         '''
         Returns the ordered list of children of this task if any
         '''
-        from .app import db
-        from .models import Task as ModelTask
         subtasks = db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").order_by(ModelTask.order)
 
@@ -120,8 +120,6 @@ class BaseTask(object):
         '''
         Gets a children by label
         '''
-        from .app import db
-        from .models import Task as ModelTask
         task = db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.label == label).first()
         if not task:
@@ -136,8 +134,6 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return None
 
-        from .app import db
-        from .models import Task as ModelTask
         parent = db.session.query(ModelTask).get(self.task_model.parent_id)
         parent_task = BaseTask.instance_by_model(parent)
         return parent_task
@@ -149,11 +145,9 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return []
 
-        from .app import db
-        from .models import Task as ModelTask
         siblings = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id)\
-            .exclude(ModelTask.id == self.task_model.id)\
+            .filter(ModelTask.id == self.task_model.parent_id,
+                ModelTask.id != self.task_model.id)\
             .order_by(ModelTask.order)
 
         return [BaseTask.instance_by_model(task)
@@ -163,10 +157,9 @@ class BaseTask(object):
         '''
         Gets a children by label
         '''
-        from .app import db
-        from .models import Task as ModelTask
         task = db.session.query(ModelTask).filter(
             ModelTask.id == self.task_model.parent_id,
+            ModelTask.id != self.task_model.id,
             ModelTask.label == label).first()
         if not task:
             return None
@@ -179,10 +172,8 @@ class BaseTask(object):
         if self.task_model.order == 0 or not self.task_model.parent_id:
             return None
 
-        from .app import db
-        from .models import Task as ModelTask
         task = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id,
+            .filter(ModelTask.parent_id == self.task_model.parent_id,
                 ModelTask.order == self.task_model.order - 1).first()
         if not task:
             return None
@@ -195,10 +186,8 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return None
 
-        from .app import db
-        from .models import Task as ModelTask
         task = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id,
+            .filter(ModelTask.parent_id == self.task_model.parent_id,
                 ModelTask.order == self.task_model.order + 1).first()
         if not task:
             return None
@@ -269,8 +258,6 @@ class SimpleTask(BaseTask):
         '''
         Create the simple task in the DB and returns the model.
         '''
-        from .app import db, app
-        from .models import Task as ModelTask, Message as ModelMessage
 
         # create task
         task_id = str(uuid4())
@@ -342,7 +329,6 @@ class SequentialTask(BaseTask):
             self._subtasks.append(subtask)
             return
 
-        from .app import db
         model = subtask.create()
         model.order = self._count_subtasks()
         model.parent_id = self.task_model.id
@@ -354,8 +340,6 @@ class SequentialTask(BaseTask):
         Internal. Count the number of subtasks. Only meant to be executed after
         the sequential task has been created in the database.
         '''
-        from .app import db
-        from .models import Task as ModelTask
         return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").count()
 
@@ -364,8 +348,6 @@ class SequentialTask(BaseTask):
         Create the task in the DB and returns the model. It also creates all the
         subtasks if they have not been created.
         '''
-        from .app import db, app
-        from .models import Task as ModelTask, Message as ModelMessage
 
         # create task
         task_id = str(uuid4())
@@ -431,7 +413,6 @@ class ParallelTask(BaseTask):
             self._subtasks.append(subtask)
             return
 
-        from .app import db
         model = subtask.create()
         model.parent_id = self.task_model.id
         db.session.add(model)
@@ -442,8 +423,6 @@ class ParallelTask(BaseTask):
         Create the task in the DB and returns the model, creating any previously
         added subtasks.
         '''
-        from .app import db, app
-        from .models import Task as ModelTask, Message as ModelMessage
 
         # create task
         task_id = str(uuid4())
@@ -480,7 +459,7 @@ class ParallelTask(BaseTask):
         return self.task_model
 
 
-class ReceiverTask(object):
+class ReceiverTask(BaseTask):
     '''
     Base class used for executing task being received in a frestq server.
     '''
@@ -495,6 +474,7 @@ class ReceiverTask(object):
     task_model = None
 
     def __init__(self, task_model):
+        super(ReceiverTask, self).__init__()
         self.task_model = task_model
 
     @staticmethod
@@ -530,8 +510,6 @@ class ReceiverTask(object):
         '''
         Executes parent task if there's any.
         '''
-        from .app import db
-        from .models import Task as ModelTask
         # check if there's a parent task, and if so execute() it
         if not self.task_model.parent_id:
             return
@@ -539,82 +517,6 @@ class ReceiverTask(object):
         parent = db.session.query(ModelTask).get(self.task_model.parent_id)
         parent_task = ReceiverTask.instance_by_model(parent)
         parent_task.execute()
-
-    def get_parent(self):
-        '''
-        Returns the parent BaseTask
-        '''
-        # check if there's a parent task, and if so execute() it
-        if not self.task_model.parent_id:
-            return None
-
-        from .app import db
-        from .models import Task as ModelTask
-        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
-        parent_task = BaseTask.instance_by_model(parent)
-        return parent_task
-
-    def get_siblings(self):
-        '''
-        Returns the list of siblings of this task if any
-        '''
-        if not self.task_model.parent_id:
-            return []
-
-        from .app import db
-        from .models import Task as ModelTask
-        siblings = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id)\
-            .exclude(ModelTask.id == self.task_model.id)\
-            .order_by(ModelTask.order)
-
-        return [BaseTask.instance_by_model(task)
-            for task in siblings]
-
-    def get_sibling(self, label):
-        '''
-        Gets a children by label
-        '''
-        from .app import db
-        from .models import Task as ModelTask
-        task = db.session.query(ModelTask).filter(
-            ModelTask.id == self.task_model.parent_id,
-            ModelTask.label == label).first()
-        if not task:
-            return None
-        return BaseTask.instance_by_model(task)
-
-    def get_prev(self):
-        '''
-        Get previous sibling if any
-        '''
-        if self.task_model.order == 0 or not self.task_model.parent_id:
-            return None
-
-        from .app import db
-        from .models import Task as ModelTask
-        task = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id,
-                ModelTask.order == self.task_model.order - 1).first()
-        if not task:
-            return None
-        return BaseTask.instance_by_model(task)
-
-    def get_next(self):
-        '''
-        Get previous sibling if any
-        '''
-        if not self.task_model.parent_id:
-            return None
-
-        from .app import db
-        from .models import Task as ModelTask
-        task = db.session.query(ModelTask)\
-            .filter(ModelTask.id == self.task_model.parent_id,
-                ModelTask.order == self.task_model.order + 1).first()
-        if not task:
-            return None
-        return BaseTask.instance_by_model(task)
 
 
 class ReceiverSimpleTask(ReceiverTask):
@@ -680,7 +582,6 @@ class ReceiverSequentialTask(ReceiverTask):
         For subtask, supported types are:
          * SimpleTask
         '''
-        from .app import db
         model = subtask.create()
         model.order = self._count_subtasks()
         model.parent_id = self.task_model.id
@@ -691,16 +592,12 @@ class ReceiverSequentialTask(ReceiverTask):
         '''
         Count the number of subtasks
         '''
-        from .app import db
-        from .models import Task as ModelTask
         return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").count()
 
     def next_subtask(self):
         '''
         Returns next subtask if any or None
         '''
-        from .app import db
-        from .models import Task as ModelTask
         return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
@@ -709,15 +606,12 @@ class ReceiverSequentialTask(ReceiverTask):
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
         '''
-        from .app import db, get_scheduler
-        from .models import Task as ModelTask
         next_subtask_model = self.next_subtask()
 
         # check if there's no subtask left to do, and send the do next signal
         # for parent task if it has one, and send the finished update to the
         # sender if it's not local
         if not next_subtask_model:
-            from .app import db
             self.task_model.status = "finished"
             db.session.add(self.task_model)
             db.session.commit()
@@ -743,8 +637,6 @@ def execute_task(task_id):
     '''
     Used to execute a task asynchronously
     '''
-    from .app import db
-    from .models import Task as ModelTask
     task_model = db.session.query(ModelTask).get(task_id)
     task = ReceiverTask.instance_by_model(task_model)
     task.execute()
@@ -766,7 +658,6 @@ class ReceiverParallelTask(ReceiverTask):
         For subtask, supported types are:
          * SimpleTask
         '''
-        from app import db
         model = subtask.create()
         model.parent_id = self.task_model.id
         db.session.add(model)
@@ -776,8 +667,6 @@ class ReceiverParallelTask(ReceiverTask):
         '''
         Count the number of subtasks
         '''
-        from .app import db
-        from .models import Task as ModelTask
         return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.status != 'finished').count()
 
@@ -785,8 +674,6 @@ class ReceiverParallelTask(ReceiverTask):
         '''
         Returns next subtask if any or None
         '''
-        from .app import db
-        from .models import Task as ModelTask
         return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
@@ -795,8 +682,6 @@ class ReceiverParallelTask(ReceiverTask):
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
         '''
-        from .app import db, get_scheduler
-        from .models import Task as ModelTask
         num_unfinished_subtasks = self.count_unfinished_subtasks()
 
         # if this is the first time do next is called and there are subtasks,
@@ -843,8 +728,6 @@ def send_message(msg_data):
     * expiration_date
     * info
     '''
-    from .app import db, app
-    from .models import Task as ModelTask, Message as ModelMessage
 
     # create message and save it in the database
     msg_data = msg_data.copy()
@@ -891,8 +774,6 @@ def send_task_update(task_id):
     task.output_status
     '''
     logging.debug("SENDING UPDATE to TASK with id %s" % task_id)
-    from .app import db
-    from .models import Task as ModelTask, Message as ModelMessage
     task = ModelTask.query.get(task_id)
     update_msg = {
         "action": "frestq.update_task",
@@ -917,13 +798,36 @@ def send_task_update(task_id):
         parent_task = ReceiverTask.instance_by_model(parent)
         parent_task.execute()
 
+def update_task(task, task_output):
+    '''
+    Updates a task
+    '''
+    if not isinstance(task_output, dict):
+        return
+
+    commit = False
+
+    if 'output_data' in task_output:
+        commit = True
+        task.task_model.output_data = task_output['output_data']
+
+    if 'output_async_data' in task_output:
+        commit = True
+        task.task_model.output_data = task_output['output_async_data']
+
+    if 'output_status' in task_output:
+        commit = True
+        task.task_model.output_data = task_output['output_status']
+
+    if commit:
+        db.session.add(task.task_model)
+        db.session.commit()
+
 def post_task(msg, action_handler):
     '''
     Called by api.post_message when action_handler is of type "task". Creates
     the requested task and processes it.
     '''
-    from .app import db, get_scheduler, app
-    from .models import Task as ModelTask, Message as ModelMessage
 
     logging.debug('EXEC TASK with id %s' % msg.task_id)
 
@@ -968,7 +872,9 @@ def post_task(msg, action_handler):
         db.session.commit()
 
     task = ReceiverTask.instance_by_model(task_model)
-    action_handler['handler_func'](task)
+    task_output = action_handler['handler_func'](task)
+
+    update_task(task, task_output)
 
     # 3. update asynchronously the task sender if requested
     if task.auto_finish_after_handler:
@@ -977,7 +883,7 @@ def post_task(msg, action_handler):
         db.session.commit()
 
     if task.send_update_to_sender:
-        get_scheduler().add_now_job(send_task_update, [task_model.id])
+        get_scheduler().add_now_job(send_task_update, [task_model.id, task_output])
 
     # 4. execute the task synchronously
     #

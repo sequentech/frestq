@@ -43,8 +43,10 @@ def hello_world(task):
     from time import sleep
     sleep(5)
 
-    username = task.task_model.input_data['username']
-    task.task_model.output_data = "hello %s!" % username
+    username = task.get_data()['input_data']['username']
+    return dict(
+        output_data = "hello %s!" % username
+    )
 
 if __name__ == "__main__":
     run_app(config_object=__name__)

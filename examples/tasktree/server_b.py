@@ -53,7 +53,7 @@ def hello_world(task):
     when all the subtasks are executed, the sender (:5000  via post_hello)
     is notified that the initial task is finished.
     '''
-    username = task.task_model.input_data['username']
+    username = task.get_data()['input_data']['username']
 
     from time import sleep
     print "hello %s! sleeping..\n" % username
@@ -90,12 +90,19 @@ def hello_world(task):
     )
     task.add(subtask2)
 
-    task.task_model.output_data = "hello %s!" % username
+    return dict(
+        output_data = "hello %s!" % username
+    )
 
 
 @decorators.task(action="testing.all_goodbyes_together", queue="hello_world")
 def all_goodbyes_together(task):
-    print "TODO"
+    return dict(
+        output_data = [
+            child.get_data()['output_data']
+                for child in task.get_prev().get_children()
+        ]
+    )
 
 if __name__ == "__main__":
     run_app(config_object=__name__)

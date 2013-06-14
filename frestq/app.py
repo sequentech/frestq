@@ -45,17 +45,18 @@ ROOT_URL = 'http://localhost:5000/api/queues'
 app.config.from_object(__name__)
 app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
 db = SQLAlchemy(app)
+
+def get_scheduler():
+    if not hasattr(FScheduler, "instance"):
+        setattr(FScheduler, "instance", FScheduler())
+    return FScheduler.instance
+
 from . import models
 
 from .api import api
 app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
-
-def get_scheduler():
-    if not hasattr(FScheduler, "instance"):
-        setattr(FScheduler, "instance", FScheduler())
-    return FScheduler.instance
 
 def run_app(config_object=None):
     parser = argparse.ArgumentParser()

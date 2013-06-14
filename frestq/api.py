@@ -24,7 +24,6 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from .action_handlers import ActionHandlers
-from .tasks import post_task
 
 api = Blueprint('api', __name__)
 
@@ -42,6 +41,7 @@ def call_action_handler(msg_id, queue_name):
     Calls asynchronously to the action handler
     '''
     from .models import Message
+    from .tasks import post_task
     logging.debug('EXEC ACTION handler for MESSAGE id %s (QUEUE %s)' % (
         msg_id, queue_name))
     msg = Message.query.get(msg_id)

@@ -190,6 +190,9 @@ class Task(db.Model):
     def __repr__(self):
         return '<Task %r>' % self.action
 
+    def get_parent(self):
+        return db.session.query(Task).get(self.parent_id)
+
     def to_dict(self, full=False):
         '''
         Return an individual instance as a dictionary.
@@ -217,12 +220,12 @@ class Task(db.Model):
             'expiration_date': self.expiration_date,
             'pingback_pending': self.pingback_pending,
             'expiration_pending': self.expiration_pending,
-            'parent_task_id': self.parent_task_id
         }
 
         if full:
-            ret['parent'] = self.parent.to_dict()
+            parent = db.session.query(Task).get(self.parent_id)
+            ret['parent'] = parent.to_dict()
         else:
-            ret['parent_id'] = self.parent.d
+            ret['parent_id'] = self.parent_id
 
         return ret
