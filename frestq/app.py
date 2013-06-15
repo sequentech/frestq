@@ -33,13 +33,14 @@ app = Flask(__name__)
 DEBUG = True
 
 # database configuration
-SQLALCHEMY_DATABASE_URI = 'sqlite:///db.sqlite'
+# example: sqlite:////absolute/path/to/db.sqlite
+SQLALCHEMY_DATABASE_URI = ''
 
 # own certificate, empty if there isn't any
 SSL_CERT_STRING = ''
 
 # queues root url
-ROOT_URL = 'http://localhost:5000/api/queues'
+ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
 # boostrap our little application
 app.config.from_object(__name__)

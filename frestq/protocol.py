@@ -33,7 +33,7 @@ def update_task(msg):
 
     task = msg.task
     logging.debug("UPDATING TASK with id %s" % task.id)
-    if task.status == "finished" and msg.data['status'] != 'error':
+    if task.status == "finished" and msg.input_data['status'] != 'error':
         # error, cannot update an already finished task (unless it's an error)!
         # TODO: send back an error update
         return
