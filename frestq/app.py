@@ -43,8 +43,6 @@ SSL_CERT_STRING = ''
 ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
 # boostrap our little application
-app.config.from_object(__name__)
-app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
 db = SQLAlchemy(app)
 
 def get_scheduler():
@@ -63,8 +61,10 @@ def run_app(config_object=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--createdb", help="create the database", action="store_true")
     args = parser.parse_args()
+    app.config.from_object(__name__)
     if config_object:
         app.config.from_object(config_object)
+    app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
     if args.createdb:
         print "creating the database"
         db.create_all()
