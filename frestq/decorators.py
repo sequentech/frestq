@@ -19,6 +19,7 @@
 from functools import wraps
 
 from .action_handlers import ActionHandlers
+from .fscheduler import FScheduler
 
 def message_action(action, queue, **kwargs):
     """
@@ -65,6 +66,7 @@ def task(action, queue, **kwargs):
         # register view_func as an action handler for the given queue
         kwargs['is_task'] = True
         ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
+        FScheduler.reserve_scheduler(queue)
 
         def wrapped(*args, **kwargs):
             '''

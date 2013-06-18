@@ -61,7 +61,7 @@ def post_message(queue_name):
     '''
     # 1. register message in the db model
 
-    from .app import db, get_scheduler
+    from .app import db
     from .models import Message
 
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
@@ -117,7 +117,9 @@ def post_message(queue_name):
             msg.action, queue_name))
 
     # 3. call to action handle
-    get_scheduler().add_now_job(call_action_handler, [msg.id, queue_name])
+    from .fscheduler import FScheduler
+    sched = FScheduler.get_scheduler(queue_name)
+    sched.add_now_job(call_action_handler, [msg.id, queue_name])
 
     # 4. return output message
     return make_response("", msg.output_status)

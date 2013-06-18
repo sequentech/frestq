@@ -45,11 +45,6 @@ ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 # boostrap our little application
 db = SQLAlchemy(app)
 
-def get_scheduler():
-    if not hasattr(FScheduler, "instance"):
-        setattr(FScheduler, "instance", FScheduler())
-    return FScheduler.instance
-
 from . import models
 
 from .api import api
@@ -70,7 +65,7 @@ def run_app(config_object=None):
         db.create_all()
         return
 
-    get_scheduler().start()
+    FScheduler.start_all_schedulers()
     app.run(threaded=True, port=app.config.get('SERVER_PORT', None), use_reloader=False)
 
 if __name__ == "__main__":

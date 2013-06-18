@@ -17,6 +17,7 @@
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
 from apscheduler.scheduler import Scheduler
+from apscheduler.threadpool import ThreadPool
 from apscheduler.util import convert_to_datetime
 
 
@@ -34,7 +35,44 @@ class NowTrigger(object):
         return '<%s>' % (self.__class__.__name__)
 
 
+
+class FThreadPool(ThreadPool):
+    def submit(self, func, *args, **kwargs):
+        return super(FThreadPool, self).submit(func, *args, **kwargs)
+
+
 class FScheduler(Scheduler):
+    _schedulers = dict()
+
+    def __init__(self, **options):
+        gconfig = {
+            'apscheduler.threadpool': FThreadPool()
+        }
+        super(FScheduler, self).__init__(gconfig, **options)
+
+    @staticmethod
+    def get_scheduler(queue_name):
+        '''
+        returns a scheduler for a spefic queue name
+        '''
+        from app import app
+        if queue_name in FScheduler._schedulers:
+            return FScheduler._schedulers[queue_name]
+
+        queues_opts = app.config.get('QUEUES_OPTIONS', dict())
+        opts = queues_opts.get(queue_name, dict())
+        FScheduler._schedulers[queue_name] = FScheduler(**opts)
+        return FScheduler._schedulers[queue_name]
+
+    @staticmethod
+    def reserve_scheduler(queue_name):
+        return FScheduler.get_scheduler(queue_name)
+
+    @staticmethod
+    def start_all_schedulers():
+        for key, value in FScheduler._schedulers.iteritems():
+            value.start()
+
     def add_now_job(self, func, args=None, kwargs=None, **options):
         """
         Schedules a job to be completed as soon as possible.

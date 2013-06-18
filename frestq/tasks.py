@@ -25,7 +25,8 @@ from datetime import datetime
 
 from flask import request
 
-from .app import db, app, get_scheduler
+from .app import db, app
+from .fscheduler import FScheduler
 from .models import Task as ModelTask, Message as ModelMessage
 
 class BaseTask(object):
@@ -618,7 +619,8 @@ class ReceiverSequentialTask(ReceiverTask):
 
             # update the sender if any
             if not self.task_model.is_local:
-                get_scheduler().add_now_job(send_task_update, [self.task_model.id])
+                sched = FScheduler.get_scheduler(self.task_model.queue_name)
+                sched.add_now_job(send_task_update, [self.task_model.id])
 
 
             # check if there's a parent task, and if so execute() it
@@ -696,7 +698,8 @@ class ReceiverParallelTask(ReceiverTask):
             # start subtasks in parallel
             subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
             for subtask in subtasks:
-                get_scheduler().add_now_job(execute_task, [subtask.id])
+                sched = FScheduler.get_scheduler(subtask.queue_name)
+                sched.add_now_job(execute_task, [subtask.id])
 
 
         # check if there's no subtask left to do, and send the do next signal
@@ -883,7 +886,8 @@ def post_task(msg, action_handler):
         db.session.commit()
 
     if task.send_update_to_sender:
-        get_scheduler().add_now_job(send_task_update, [task_model.id, task_output])
+        sched = FScheduler.get_scheduler(task_model.queue_name)
+        sched.add_now_job(send_task_update, [task_model.id, task_output])
 
     # 4. execute the task synchronously
     #
