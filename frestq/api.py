@@ -24,6 +24,7 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from .action_handlers import ActionHandlers
+from .utils import loads
 
 api = Blueprint('api', __name__)
 
@@ -64,12 +65,9 @@ def post_message(queue_name):
     from .app import db
     from .models import Message
 
-    if queue_name.startswith("internal."):
-        return error(403, "internal queue_name not allowed %s" % queue_name)
-
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
     try:
-        data = json.loads(request.data)
+        data = loads(request.data)
     except:
         return error(400, "invalid json")
 

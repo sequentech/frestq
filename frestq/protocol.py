@@ -25,7 +25,7 @@ from flask import Blueprint, request, make_response
 
 from .action_handlers import ActionHandlers
 from . import decorators
-from fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
+from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 
 @decorators.message_action(action="frestq.update_task", queue=INTERNAL_SCHEDULER_NAME)
 def update_task(msg):
@@ -64,8 +64,9 @@ def reserve_task(task_id, cond):
     task from the receiver's point of view. When synced, this also executes the
     task.
     '''
-    from .app import db
+    from .app import db, app
     from .models import Task as ModelTask
+    from .tasks import ReceiverTask
 
     # 1. get task and check everything is ok
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
@@ -151,6 +152,7 @@ def cancel_reserved_task(task_id, cond):
     '''
     from .app import db
     from .models import Task as ModelTask
+    from .tasks import ReceiverTask
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
 
@@ -170,7 +172,7 @@ def ack_reservation(task_id):
     '''
     Sends a confirmation of a task reservation to a task sender
     '''
-    from .app import db
+    from .app import db, app
     from .models import Task as ModelTask
     from .tasks import send_message
 
@@ -196,7 +198,7 @@ def ack_reservation(task_id):
 
 @decorators.message_action(action="frestq.synchronize_task", queue=INTERNAL_SCHEDULER_NAME)
 def synchronize_task(msg):
-    from .app import db
+    from .app import db, app
     from .models import Task as ModelTask
 
     logging.debug("SYNCING TASK with id %s" % msg.task_id)
@@ -255,7 +257,7 @@ def director_confirm_task_reservation(msg):
     '''
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import send_synchronization_message
+    from .tasks import ReceiverTask, send_synchronization_message
 
     task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     task_instance = ReceiverTask.instance_by_model(task)
@@ -268,7 +270,7 @@ def director_confirm_task_reservation(msg):
         return
 
     task.status = 'reserved'
-    task.reservation_data = msg.input_data['reservation_data']
+    task.reservation_data = msg.input_data.get('reservation_data', None)
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
@@ -307,6 +309,7 @@ def director_cancel_reserved_task(task_id):
     '''
     from .app import db
     from .models import Task as ModelTask
+    from .tasks import ReceiverTask
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     task_instance = ReceiverTask.instance_by_model(task)
@@ -356,6 +359,7 @@ def execute_synchronized(msg):
     from .models import Task as ModelTask
     from .api import call_action_handler
     from .fscheduler import FScheduler
+    from .tasks import ReceiverTask
 
     task = ModelTask.query.get(msg.task_id)
     if task.status != 'reserved':

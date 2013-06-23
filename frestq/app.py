@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import unicode_literals
 import logging
 import argparse
 from fscheduler import FScheduler
@@ -75,6 +76,7 @@ def run_app(config_object=None):
     if config_object:
         app.config.from_object(config_object)
     app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
+
     if args.createdb:
         print "creating the database"
         db.create_all()

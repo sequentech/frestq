@@ -20,6 +20,7 @@ import requests
 import logging
 import json
 import types
+
 import copy
 from uuid import uuid4
 from datetime import datetime
@@ -29,6 +30,7 @@ from flask import request
 from .app import db, app
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 from .models import Task as ModelTask, Message as ModelMessage
+from .utils import dumps
 
 class BaseTask(object):
     '''
@@ -595,7 +597,7 @@ class ReceiverTask(BaseTask):
         if action_handler_data:
             self.action_handler = action_handler_data['handler_func']
 
-        if type(self.action_handler) is types.ClassType:
+        if type(self.action_handler) is types.TypeType:
             self.action_handler_object = self.action_handler(task_model)
 
     def run_action_handler(self):
@@ -987,7 +989,7 @@ def send_message(msg_data):
         msg.id, msg.action, url))
 
     # TODO: use and check ssl certs here
-    r = requests.post(url, data=json.dumps(payload))
+    r = requests.post(url, data=dumps(payload))
 
     # TODO: check r.status_code and do some retries if it failed
     msg.output_status = r.status_code

@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import unicode_literals
+
 from apscheduler.scheduler import Scheduler
 from apscheduler.threadpool import ThreadPool
 from apscheduler.util import convert_to_datetime
@@ -55,16 +57,10 @@ class FScheduler(Scheduler):
         '''
         returns a scheduler for a spefic queue name
         '''
-        from .app import app
         if queue_name in FScheduler._schedulers:
             return FScheduler._schedulers[queue_name]
 
-        queues_opts = app.config.get('QUEUES_OPTIONS', dict())
-        opts = queues_opts.get(queue_name, dict())
-        constructor_opts = dict()
-        if 'max_threads' in opts:
-            constructor_opts['max_threads'] = opts['max_threads']
-        FScheduler._schedulers[queue_name] = sched = FScheduler(**opts)
+        FScheduler._schedulers[queue_name] = sched = FScheduler()
         sched.queue_name = queue_name
         return sched
 
@@ -74,10 +70,27 @@ class FScheduler(Scheduler):
 
     @staticmethod
     def start_all_schedulers():
+        '''
+        Starts all the statically registered schedulers. It will also adjust
+        the maximum number of threads now. This is not done in a previous stage
+        because in frestq the app config is not guaranteed to be completely
+        setup until this moment.
+        '''
+        from .app import app
+
         FScheduler.reserve_scheduler(INTERNAL_SCHEDULER_NAME)
-        for key, value in FScheduler._schedulers.iteritems():
-            print "starting %s scheduler" % key
-            value.start()
+        queues_opts = app.config.get('QUEUES_OPTIONS', dict())
+
+        for queue_name, sched in FScheduler._schedulers.iteritems():
+            print "starting %s scheduler" % queue_name
+
+            opts = queues_opts.get(queue_name, dict())
+            if 'max_threads' in opts:
+                print "setting scheduler for queue %s with "\
+                    "max_threads = %d " %(queue_name, opts['max_threads'])
+                sched._threadpool.max_threads = opts['max_threads']
+
+            sched.start()
 
     def add_now_job(self, func, args=None, kwargs=None, **options):
         """
