@@ -57,3 +57,89 @@ class ActionHandlers(object):
             return None
 
         return ActionHandlers._static_queue_list[queue_name]
+
+class TaskHandler(object):
+    '''
+    This is a class-based task handler. Substitute the function-based
+    task handlers
+    '''
+    # task member variable will contain a pointer to the task model when
+    # TaskHandler.execute is called.
+    task = None
+
+    def __init__(self, task):
+        print
+        self.task = task
+
+    def execute(self):
+        '''
+        Executes the task handler.
+
+        Reimplementing this function is optional but highly recommendable.
+        '''
+        pass
+
+class SynchronizedSubtaskHandler(TaskHandler):
+    '''
+    A task handler for tasks whose parent (which could be a remote parent) is
+    a SynchronizedTask.
+    '''
+
+    def reserve(self):
+        '''
+        called when the task is going to be reserved. Return data will be sent
+        to the task sender and set as reservation_data.
+
+        Implementing this function is optional.
+        '''
+        pass
+
+    def cancel_reservation(self):
+        '''
+        called when the task, for some reason (perhaps an error ocurred, or
+        maybe the reservation just timedout), is going to be unreserved.
+
+        Implementing this function is optional.
+        '''
+        pass
+
+
+class SynchronizedTaskHandler(TaskHandler):
+    '''
+    A task handler for synchronized tasks. This deals with synchronization data
+    coming and being sent to subtasks.
+    '''
+
+    def new_reservation(self, subtask):
+        '''
+        called when the task is going to be reserved.
+
+        subtask.get_data()["reservation_data"] will be set with the data
+        returned by SynchronizedSubtaskHandler.reserve.
+
+        Implementing this function is optional.
+        '''
+        pass
+
+    def cancelled_reservation(self, subtask):
+        '''
+        called when the subtask, for some reason (perhaps an error ocurred, or
+        maybe the reservation just timedout), is going to be unreserved.
+        '''
+        pass
+
+    def pre_execute(self):
+        '''
+        Called after the subtasks have been executed, just before the signal
+        to start the execution of all subtasks is going to be sent.
+
+        It's the last opportunity to modify the input_data of each subtask
+        before that data is sent to the subtasks for execution. Here's an
+        example of how to do that:
+
+        child = self.task.get_children()[0]
+        child.task_model.input_data["last_minute_detail"] = "foobar"
+        db.session.add(child.task_model)
+        db.session.commit()
+        '''
+        pass

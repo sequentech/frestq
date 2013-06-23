@@ -42,8 +42,23 @@ SSL_CERT_STRING = ''
 # queues root url
 ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
+# time a thread can be reserved in for synchronization purposes. In seconds.
+RESERVATION_TIMEOUT = 60
+
 # boostrap our little application
 db = SQLAlchemy(app)
+
+# options for each queue. example:
+#QUEUES_OPTIONS = {
+    #'mycustom_queue': {
+        #'max_threads': 3,
+    #}
+#}
+# thread data mapper is a function that would be called when a Synchronous task
+# in this queue is going to be executed. It allows to set queue-specific
+# settings, and even custom queue settings that can be used by you later.
+
+QUEUES_OPTIONS = dict()
 
 from . import models
 

@@ -16,10 +16,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
+import types
 from functools import wraps
 
 from .action_handlers import ActionHandlers
-from .fscheduler import FScheduler
+from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 
 def message_action(action, queue, **kwargs):
     """
@@ -38,14 +39,8 @@ def message_action(action, queue, **kwargs):
         # register view_func as an action handler for the given queue
         ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
 
-        def wrapped(*args, **kwargs):
-            '''
-            This is the runtime wrapper, called when a wrapped function is
-            being called.
-            '''
-            # TODO: Place some callbacks in the scheduler
-            return view_func(*args, **kwargs)
-        return wraps(view_func)(wrapped)
+        return view_func
+
     return decorator
 
 def task(action, queue, **kwargs):
@@ -65,14 +60,41 @@ def task(action, queue, **kwargs):
         '''
         # register view_func as an action handler for the given queue
         kwargs['is_task'] = True
+        if  type(view_func) is types.ClassType:
+            klass.action = action
+            klass.queue_name = queue
+
         ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
         FScheduler.reserve_scheduler(queue)
 
-        def wrapped(*args, **kwargs):
-            '''
-            This is the runtime wrapper, called when a wrapped function is
-            being called.
-            '''
-            return view_func(*args, **kwargs)
-        return wraps(view_func)(wrapped)
+        return view_func
+
+    return decorator
+
+def internal_task(name, **kwargs):
+    """
+    Decorator for class based internal task handlers
+    """
+
+    # Check if perm is given as string in order not to decorate
+    # view function itself which makes debugging harder
+    if not isinstance(name, basestring):
+        raise Exception("name must be a string")
+
+    def decorator(klass):
+        '''
+        This is the static wrapper, called when loading the code a wrapped
+        funcion
+        '''
+        # register view_func as an action handler for the given queue
+        kwargs['is_task'] = True
+        kwargs['is_internal'] = True
+        klass.action = name
+        klass.queue_name = INTERNAL_SCHEDULER_NAME
+        ActionHandlers.add_action_handler(klass.action, klass.queue_name,
+                                          klass, kwargs)
+        FScheduler.reserve_scheduler(klass.queue_name)
+
+        return klass
+
     return decorator

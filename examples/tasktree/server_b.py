@@ -35,7 +35,6 @@ SERVER_PORT = 5001
 
 ROOT_URL = 'http://127.0.0.1:5001/api/queues'
 
-
 # action handler:
 
 @decorators.task(action="testing.hello_world", queue="hello_world")
@@ -44,11 +43,14 @@ def hello_world(task):
     complex tree of subtasks are executed:
       hello_world (current local task :5001, sequential)
         |
-        |-- subtask (local virtual task :5001, sequential)
-               |
-               |-- subsubtask1/goodbye_cruel_world (local task :5001, simple)
-               |
-               |-- subsubtask2(goodbye_cruel_world (remote task :5000, simple)
+        |-- subtask (local virtual task :5001, parallel)
+        |      |
+        |      |-- subsubtask1/goodbye_cruel_world (local task :5001, simple)
+        |      |
+        |      |-- subsubtask2(goodbye_cruel_world (remote task :5000, simple)
+        |
+        |-- subtask2 (local virtual task :5001, simple)
+
 
     when all the subtasks are executed, the sender (:5000  via post_hello)
     is notified that the initial task is finished.
@@ -93,7 +95,6 @@ def hello_world(task):
     return dict(
         output_data = "hello %s!" % username
     )
-
 
 @decorators.task(action="testing.all_goodbyes_together", queue="hello_world")
 def all_goodbyes_together(task):

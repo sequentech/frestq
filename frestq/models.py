@@ -171,6 +171,8 @@ class Task(db.Model):
 
     output_async_data = db.Column(JSONEncodedDict)
 
+    reservation_data = db.Column(JSONEncodedDict)
+
     pingback_date = db.Column(db.DateTime, default=None)
 
     pingback_pending = db.Column(db.Boolean, default=False)
@@ -215,6 +217,7 @@ class Task(db.Model):
             'input_data': self.input_data,
             'input_async_data': self.input_async_data,
             'output_data': self.output_data,
+            'reservation_data': self.reservation_data,
             'output_async_data': self.output_async_data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,

@@ -20,6 +20,7 @@ from apscheduler.scheduler import Scheduler
 from apscheduler.threadpool import ThreadPool
 from apscheduler.util import convert_to_datetime
 
+INTERNAL_SCHEDULER_NAME = "internal.frestq"
 
 class NowTrigger(object):
     def __init__(self):
@@ -33,7 +34,6 @@ class NowTrigger(object):
 
     def __repr__(self):
         return '<%s>' % (self.__class__.__name__)
-
 
 
 class FThreadPool(ThreadPool):
@@ -55,14 +55,18 @@ class FScheduler(Scheduler):
         '''
         returns a scheduler for a spefic queue name
         '''
-        from app import app
+        from .app import app
         if queue_name in FScheduler._schedulers:
             return FScheduler._schedulers[queue_name]
 
         queues_opts = app.config.get('QUEUES_OPTIONS', dict())
         opts = queues_opts.get(queue_name, dict())
-        FScheduler._schedulers[queue_name] = FScheduler(**opts)
-        return FScheduler._schedulers[queue_name]
+        constructor_opts = dict()
+        if 'max_threads' in opts:
+            constructor_opts['max_threads'] = opts['max_threads']
+        FScheduler._schedulers[queue_name] = sched = FScheduler(**opts)
+        sched.queue_name = queue_name
+        return sched
 
     @staticmethod
     def reserve_scheduler(queue_name):
@@ -70,7 +74,9 @@ class FScheduler(Scheduler):
 
     @staticmethod
     def start_all_schedulers():
+        FScheduler.reserve_scheduler(INTERNAL_SCHEDULER_NAME)
         for key, value in FScheduler._schedulers.iteritems():
+            print "starting %s scheduler" % key
             value.start()
 
     def add_now_job(self, func, args=None, kwargs=None, **options):
@@ -87,6 +93,8 @@ class FScheduler(Scheduler):
         :type date: :class:`datetime.date`
         :rtype: :class:`~apscheduler.job.Job`
         """
+
+        print "adding job in sched for queue %s" % self.queue_name
         trigger = NowTrigger()
         options['max_runs'] = 1
         return self.add_job(trigger, func, args, kwargs, **options)
