@@ -1,5 +1,5 @@
 flask
 flask-sqlalchemy
-apscheduler
+hg+https://edulix@bitbucket.org/edulix/apscheduler
 ipdb
 requests

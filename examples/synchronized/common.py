@@ -37,12 +37,14 @@ class GoodbyeCruelWorldHandler(SynchronizedSubtaskHandler):
                     _byebye_ports.append(port)
                     break
 
-        # sets task.get_data()['reservation_data'], which gets sent to sender
+        # sets self.task.get_data()['reservation_data'], which gets sent to sender
         return dict(port=port)
 
     def cancel_reservation(self):
+        port = self.task.get_data()['reservation_data']
         with _byebyes_lock:
-            _byebye_ports.remove(port)
+            if port in _byebye_ports:
+                _byebye_ports.remove(port)
 
     def execute(self):
         username = self.task.get_data()['input_data']['username']

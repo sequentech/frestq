@@ -81,7 +81,7 @@ class BaseTask(object):
             'queue_name': self.task_model.queue_name,
             'sender_url': app.config.get('ROOT_URL'),
             'receiver_url': self.task_model.receiver_url,
-            'data': self.task_model.input_data,
+            'input_data': self.task_model.input_data,
             'task_id': self.task_model.id
         }
         logging.debug('SEND task MESSAGE to %s, TASK id = %s' % (
@@ -124,7 +124,7 @@ class BaseTask(object):
         subtasks = db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").order_by(ModelTask.order)
 
-        children_tasks = [BaseTask.instance_by_model(task)
+        children_tasks = [self.instance_by_model(task)
             for task in subtasks]
         return children_tasks
 
@@ -136,7 +136,7 @@ class BaseTask(object):
             "subtasks").filter(ModelTask.label == label).first()
         if not task:
             return None
-        return BaseTask.instance_by_model(task)
+        return self.instance_by_model(task)
 
     def get_parent(self):
         '''
@@ -147,7 +147,7 @@ class BaseTask(object):
             return None
 
         parent = db.session.query(ModelTask).get(self.task_model.parent_id)
-        parent_task = BaseTask.instance_by_model(parent)
+        parent_task = self.instance_by_model(parent)
         return parent_task
 
     def get_siblings(self):
@@ -162,7 +162,7 @@ class BaseTask(object):
                 ModelTask.id != self.task_model.id)\
             .order_by(ModelTask.order)
 
-        return [BaseTask.instance_by_model(task)
+        return [self.instance_by_model(task)
             for task in siblings]
 
     def get_sibling(self, label):
@@ -175,7 +175,7 @@ class BaseTask(object):
             ModelTask.label == label).first()
         if not task:
             return None
-        return BaseTask.instance_by_model(task)
+        return self.instance_by_model(task)
 
     def get_prev(self):
         '''
@@ -189,7 +189,7 @@ class BaseTask(object):
                 ModelTask.order == self.task_model.order - 1).first()
         if not task:
             return None
-        return BaseTask.instance_by_model(task)
+        return self.instance_by_model(task)
 
     def get_next(self):
         '''
@@ -203,7 +203,7 @@ class BaseTask(object):
                 ModelTask.order == self.task_model.order + 1).first()
         if not task:
             return None
-        return BaseTask.instance_by_model(task)
+        return self.instance_by_model(task)
 
 
 class SimpleTask(BaseTask):
@@ -598,14 +598,14 @@ class ReceiverTask(BaseTask):
             self.action_handler = action_handler_data['handler_func']
 
         if type(self.action_handler) is types.TypeType:
-            self.action_handler_object = self.action_handler(task_model)
+            self.action_handler_object = self.action_handler(self)
 
     def run_action_handler(self):
         if self.is_internal():
             return None
 
         if self.action_handler_object:
-            return self.action_handler_object.execute(self)
+            return self.action_handler_object.execute()
         else:
             return self.action_handler(self)
 
@@ -860,7 +860,7 @@ def send_synchronization_message(task_id):
         "queue_name": INTERNAL_SCHEDULER_NAME,
         "receiver_url": task.sender_url,
         "receiver_ssl_cert": task.sender_ssl_cert,
-        "data": {
+        "input_data": {
             'task_id': task_id,
             'action': task.action,
             'queue_name': task.queue_name,
@@ -954,8 +954,7 @@ def send_message(msg_data):
 
     And the following optional fields:
     * receiver_ssl_cert
-    * data
-    * async_data
+    * input_data
     * task_id
     * pingback_date
     * expiration_date
@@ -978,7 +977,7 @@ def send_message(msg_data):
         'message_id': msg.id,
         'action': msg.action,
         'sender_url': msg.sender_url,
-        "data": msg_data.get('data', '')
+        "data": msg_data.get('input_data', '')
     }
     opts = ['async_data', 'task_id', 'pingback_date', 'expiration_date', 'info']
     for opt in opts:
@@ -1013,7 +1012,7 @@ def send_task_update(task_id):
         "queue_name": INTERNAL_SCHEDULER_NAME,
         "receiver_url": task.sender_url,
         "receiver_ssl_cert": task.sender_ssl_cert,
-        "data": {
+        "input_data": {
             'output_data': task.output_data,
             'output_async_data': task.output_async_data,
             'status': task.status

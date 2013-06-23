@@ -19,6 +19,7 @@
 import copy
 
 from frestq import decorators
+from frestq.app import db
 from frestq.app import app, run_app
 from frestq.tasks import SimpleTask, ParallelTask, SynchronizedTask
 from frestq.action_handlers import SynchronizedTaskHandler
@@ -63,10 +64,10 @@ class SynchronizedGoodbyeHandler(SynchronizedTaskHandler):
         '''
         subtask_id = subtask.get_data()["id"]
         reservation_data = subtask.get_data()["reservation_data"]
-        if not isinstance(self.task.task_model.input_data, dict):
-            self.task.task_model.input_data = dict()
+        if not isinstance(self.task.task_model.reservation_data, dict):
+            self.task.task_model.reservation_data = dict()
 
-        self.task.task_model.input_data[subtask_id] = reservation_data
+        self.task.task_model.reservation_data[subtask_id] = reservation_data
         db.session.add(self.task.task_model)
         db.session.commit()
 
@@ -131,27 +132,26 @@ def hello_world(task):
     task111 = SimpleTask(**goodbye_kwargs)
     task11.add(task111)
 
-    task112 = SimpleTask(**goodbye_kwargs)
-    task11.add(task112)
+    #task112 = SimpleTask(**goodbye_kwargs)
+    #task11.add(task112)
 
     task113 = SimpleTask(**goodbye_remote_kwargs)
     task11.add(task113)
 
-    task12 = SynchronizedTask(handler=SynchronizedGoodbyeHandler)
-    task1.add(task12)
+    #task12 = SynchronizedTask(handler=SynchronizedGoodbyeHandler)
+    #task1.add(task12)
 
-    task121 = SimpleTask(**goodbye_kwargs)
-    task12.add(task121)
+    #task121 = SimpleTask(**goodbye_kwargs)
+    #task12.add(task121)
 
-    task122 = SimpleTask(**goodbye_kwargs)
-    task12.add(task122)
+    #task122 = SimpleTask(**goodbye_kwargs)
+    #task12.add(task122)
 
-    task123 = SimpleTask(**goodbye_remote_kwargs)
-    task12.add(task123)
+    #task123 = SimpleTask(**goodbye_remote_kwargs)
+    #task12.add(task123)
 
-
-    task2 = SimpleTask(**goodbye_remote_kwargs)
-    task.add(task2)
+    #task2 = SimpleTask(**goodbye_remote_kwargs)
+    #task.add(task2)
 
     return dict(
         output_data = "hello %s!" % username

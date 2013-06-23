@@ -47,6 +47,8 @@ def call_action_handler(msg_id, queue_name):
         msg_id, queue_name))
     msg = Message.query.get(msg_id)
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
+    if not action_handler:
+        raise Exception('action handler not found')
     if action_handler.get('is_task', False):
         post_task(msg, action_handler)
     else:
