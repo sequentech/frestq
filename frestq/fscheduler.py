@@ -110,4 +110,7 @@ class FScheduler(Scheduler):
         print "adding job in sched for queue %s" % self.queue_name
         trigger = NowTrigger()
         options['max_runs'] = 1
+        if 'misfire_grace_time' not in options:
+            # default to misfire_grace_time of 24 hours!
+            options['misfire_grace_time'] = 3600*24
         return self.add_job(trigger, func, args, kwargs, **options)

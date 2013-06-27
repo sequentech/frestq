@@ -858,8 +858,8 @@ def send_synchronization_message(task_id):
     msg = {
         "action": "frestq.synchronize_task",
         "queue_name": INTERNAL_SCHEDULER_NAME,
-        "receiver_url": task.sender_url,
-        "receiver_ssl_cert": task.sender_ssl_cert,
+        "receiver_url": task.receiver_url,
+        "receiver_ssl_cert": task.receiver_ssl_cert,
         "input_data": {
             'task_id': task_id,
             'action': task.action,
@@ -1019,6 +1019,7 @@ def send_task_update(task_id):
         },
         "task_id": task.id
     }
+    logging.debug("update_msg.inputdata: %s" % dumps(update_msg["input_data"]))
     send_message(update_msg)
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)

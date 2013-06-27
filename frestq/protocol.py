@@ -26,6 +26,7 @@ from flask import Blueprint, request, make_response
 from .action_handlers import ActionHandlers
 from . import decorators
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
+from .utils import dumps
 
 @decorators.message_action(action="frestq.update_task", queue=INTERNAL_SCHEDULER_NAME)
 def update_task(msg):
@@ -46,6 +47,9 @@ def update_task(msg):
             if isinstance(msg.input_data[key], basestring):
                 logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
                     msg.input_data[key]))
+            else:
+                logging.debug("SETTING TASK FIELD '%s' to: %s" % (key,
+                    dumps(msg.input_data[key])))
             setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
@@ -91,7 +95,7 @@ def reserve_task(task_id):
     # 4. set reservation timeout
     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
     date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
-    sched.add_date_job(cancel_reserved_task, date, [task.id])
+    sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
     # 5. wait for a cancel or execute message
     with _reserve_condition:
@@ -113,7 +117,8 @@ def reserve_task(task_id):
 
             # 6. task received confirmation, we're ready to finally execute the task
             elif task.status == 'confirmed':
-                logging.debug("EXECUTING synchronized SUBTASK with id %s", task.id)
+                logging.debug("EXECUTING synchronized SUBTASK with id %s, "\
+                    "action = %s" % (task.id, task.action))
                 # adapted from the final part of tasks.py:post_task() function
                 from .tasks import ReceiverTask, update_task
                 task_model = task
@@ -146,11 +151,14 @@ def reserve_task(task_id):
                 task.execute()
                 return
 
-def cancel_reserved_task(task_id):
+def cancel_reserved_subtask(task_id):
     '''
     Cancels a reserved task. This is done by setting the task to created and
     then sending a notification to the condition, so that the waiting threads
     (among which the correct one will be) will wake up take the notice.
+
+    Note: this task is executed in cases where the task can be either local and
+    not local.
     '''
     from .app import db
     from .models import Task as ModelTask
@@ -159,9 +167,12 @@ def cancel_reserved_task(task_id):
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
 
     task_instance = ReceiverTask.instance_by_model(task)
-    task_instance.action_handler_object.cancel_reservation()
+    # task action_handler_object might not be present, it's not mandatory, and
+    # only provided in the task receiver node
+    if task_instance.action_handler_object:
+        task_instance.action_handler_object.cancel_reservation()
 
-    if task.status != 'reserved':
+    if task.status not in ['syncing', 'reserved']:
         return
 
     task.status = "created"
@@ -173,7 +184,7 @@ def cancel_reserved_task(task_id):
 
 def ack_reservation(task_id):
     '''
-    Sends a confirmation of a task reservation to a task sender
+    Sends a confirmation of a task reservation to task sender
     '''
     from .app import db, app
     from .models import Task as ModelTask
@@ -184,6 +195,8 @@ def ack_reservation(task_id):
         return
 
     # reservation_timeout is also sent
+
+    logging.debug("SENDING ACK RESERVATION TO SENDER of task with id %s", task_id)
     date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
     task = ModelTask.query.get(task_id)
     msg = {
@@ -201,6 +214,10 @@ def ack_reservation(task_id):
 
 @decorators.message_action(action="frestq.synchronize_task", queue=INTERNAL_SCHEDULER_NAME)
 def synchronize_task(msg):
+    '''
+    Receives a task that needs to be synchronized because its parent is a
+    SynchronizedTask
+    '''
     from .app import db, app
     from .models import Task as ModelTask
 
@@ -215,8 +232,8 @@ def synchronize_task(msg):
     is_local = msg.sender_url == app.config.get('ROOT_URL')
     if not task:
         kwargs = {
-            'action': msg.action,
-            'queue_name': msg.queue_name,
+            'action': msg.input_data['action'],
+            'queue_name': msg.input_data['queue_name'],
             'sender_url': msg.sender_url,
             'receiver_url': msg.receiver_url,
             'is_received': msg.is_received,
@@ -250,7 +267,7 @@ def synchronize_task(msg):
     if task.expiration_date:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
         date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
-        sched.add_date_job(cancel_reserved_task, date, [task.id])
+        sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
 
 @decorators.message_action(action="frestq.confirm_task_reservation", queue=INTERNAL_SCHEDULER_NAME)
@@ -283,7 +300,7 @@ def director_confirm_task_reservation(msg):
     # set reservation timeout
     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
     date = msg.input_data['reservation_expiration_date']
-    sched.add_date_job(director_cancel_reserved_task, date, [task.id])
+    sched.add_date_job(director_cancel_reserved_subtask, date, [task.id])
 
     # call to the new_reservation handler
     if parent_instance.action_handler_object:
@@ -306,9 +323,9 @@ def director_confirm_task_reservation(msg):
     for child in parent_instance.get_children():
         sched.add_now_job(director_synchronized_subtask_start, [child.task_model.id])
 
-def director_cancel_reserved_task(task_id):
+def director_cancel_reserved_subtask(task_id):
     '''
-    Cancel a task (normally because a reservation timeout) in the director node
+    Cancel a task because a reservation timeout in the director node
     '''
     from .app import db
     from .models import Task as ModelTask
@@ -325,6 +342,19 @@ def director_cancel_reserved_task(task_id):
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
+
+    #if all tasks are created, it means all tasks have expired, so we cannot
+    #wait for a confirmation that will launch again all the expired tasks.
+    #Conclusion: we send the reservations here
+    sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
+    for child in parent_instance.get_children():
+        if child.task_model.status != 'created':
+            return
+
+    # find any unreserved task, send reservation
+    for child in parent_instance.get_children():
+        if child.task_model.status == 'created':
+            sched.add_now_job(send_synchronization_message, [child.task_model.id])
 
 def director_synchronized_subtask_start(task_id):
     '''
@@ -344,9 +374,11 @@ def director_synchronized_subtask_start(task_id):
     msg = {
         "action": "frestq.execute_synchronized",
         "queue_name": INTERNAL_SCHEDULER_NAME,
-        "receiver_url": task.sender_url,
-        "receiver_ssl_cert": task.sender_ssl_cert,
+        "receiver_url": task.receiver_url,
+        "receiver_ssl_cert": task.receiver_ssl_cert,
         "input_data": {
+            'action': task.action,
+            'queue_name': task.queue_name,
             'input_data': task.input_data,
             'input_async_data': task.input_async_data,
         },

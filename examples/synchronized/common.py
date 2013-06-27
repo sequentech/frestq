@@ -19,8 +19,10 @@
 from frestq import decorators
 from frestq.app import app
 from frestq.action_handlers import SynchronizedSubtaskHandler
+from frestq.utils import dumps
 
 from threading import Lock
+
 
 # list of reserved ports
 _byebye_ports = list()
@@ -48,15 +50,20 @@ class GoodbyeCruelWorldHandler(SynchronizedSubtaskHandler):
 
     def execute(self):
         username = self.task.get_data()['input_data']['username']
-        print "our reservation: ", self.task.get_data()['reservation_data']
-        print "others reservation: ", self.task.get_data()['input_data']['reservation_data']
+        print "our reservation: ", dumps(self.task.get_data()['reservation_data'])
+        print "others reservation: ", dumps(self.task.get_data()['input_data'])
 
         print "woke up! time to finish =)\n"
+        server_name = app.config.get('SERVER_NAME')
 
         # free the port
         self.cancel_reservation()
 
         # set task.get_data()['output_data'] which will be transmitted to task sender
         return dict(
-            output_data = "goodbye %s from port!" % username
+            output_data = "goodbye %s from port %d in server %s!" % (
+                username,
+                self.task.get_data()['reservation_data']['port'],
+                app.config.get('SERVER_NAME')
+            )
         )

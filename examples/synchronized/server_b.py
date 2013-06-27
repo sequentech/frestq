@@ -33,11 +33,11 @@ import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
 SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
-SERVER_NAME = '127.0.0.1:5001'
-
 SERVER_PORT = 5001
 
-ROOT_URL = 'http://127.0.0.1:5001/api/queues'
+SERVER_NAME = '127.0.0.1:%d' % SERVER_PORT
+
+ROOT_URL = 'http://%s/api/queues' % SERVER_NAME
 
 QUEUES_OPTIONS = {
     'goodbye_world': {
@@ -132,38 +132,51 @@ def hello_world(task):
     task111 = SimpleTask(**goodbye_kwargs)
     task11.add(task111)
 
-    #task112 = SimpleTask(**goodbye_kwargs)
-    #task11.add(task112)
+    task112 = SimpleTask(**goodbye_kwargs)
+    task11.add(task112)
 
     task113 = SimpleTask(**goodbye_remote_kwargs)
     task11.add(task113)
 
-    #task12 = SynchronizedTask(handler=SynchronizedGoodbyeHandler)
-    #task1.add(task12)
+    task12 = SynchronizedTask(handler=SynchronizedGoodbyeHandler)
+    task1.add(task12)
 
-    #task121 = SimpleTask(**goodbye_kwargs)
-    #task12.add(task121)
+    task121 = SimpleTask(**goodbye_kwargs)
+    task12.add(task121)
 
-    #task122 = SimpleTask(**goodbye_kwargs)
-    #task12.add(task122)
+    task122 = SimpleTask(**goodbye_kwargs)
+    task12.add(task122)
 
-    #task123 = SimpleTask(**goodbye_remote_kwargs)
-    #task12.add(task123)
+    task123 = SimpleTask(**goodbye_remote_kwargs)
+    task12.add(task123)
 
-    #task2 = SimpleTask(**goodbye_remote_kwargs)
-    #task.add(task2)
+    all_goodbyes_together_kwargs = dict(
+        receiver_url='http://127.0.0.1:5001/api/queues',
+        action="testing.all_goodbyes_together",
+        queue="end_of_the_world"
+    )
 
+    task2 = SimpleTask(**all_goodbyes_together_kwargs)
+    task.add(task2)
+
+    # this will get overridden by last task, all_goodbyes_together
     return dict(
         output_data = "hello %s!" % username
     )
 
-@decorators.task(action="testing.all_goodbyes_together", queue="hello_world")
+@decorators.task(action="testing.all_goodbyes_together", queue="end_of_the_world")
 def all_goodbyes_together(task):
+    output_data = [
+        child.get_data()['output_data']
+            for child in task.get_prev().get_children()[0].get_children()
+    ]
+    parent_model = task.get_parent().task_model
+    task.get_parent().task_model.output_data = output_data
+    db.session.add(parent_model)
+    db.session.commit()
+
     return dict(
-        output_data = [
-            child.get_data()['output_data']
-                for child in task.get_prev().get_children()
-        ]
+        output_data = output_data
     )
 
 if __name__ == "__main__":

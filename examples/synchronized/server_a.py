@@ -28,6 +28,12 @@ import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
 SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db.sqlite' % ROOT_PATH
 
+SERVER_PORT = 5000
+
+SERVER_NAME = '127.0.0.1:%d' % SERVER_PORT
+
+ROOT_URL = 'http://%s/api/queues' % SERVER_NAME
+
 QUEUES_OPTIONS = {
     "goodbye_world": {
         "max_threads": 11,
