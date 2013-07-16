@@ -62,8 +62,8 @@ def task(action, queue, **kwargs):
         # register view_func as an action handler for the given queue
         kwargs['is_task'] = True
         if  type(view_func) is types.ClassType:
-            klass.action = action
-            klass.queue_name = queue
+            view_func.action = action
+            view_func.queue_name = queue
 
         ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
         FScheduler.reserve_scheduler(queue)

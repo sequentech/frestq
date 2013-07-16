@@ -101,7 +101,6 @@ def post_message(queue_name):
                 'is_received': True,
                 'sender_ssl_cert': sender_ssl_cert,
                 'input_data': data.get('data', None),
-                'input_async_data': data.get('async_data', None),
                 'pingback_date': data.get('pingback_date', None),
                 'expiration_date': data.get('expiration_date', None),
                 'info_text': data.get('info_text', None),

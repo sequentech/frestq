@@ -186,8 +186,6 @@ class Message(db.Model):
 
     input_data = db.Column(JSONEncodedDict)
 
-    input_async_data = db.Column(JSONEncodedDict)
-
     output_status = db.Column(db.Integer)
 
     pingback_date = db.Column(db.DateTime, default=None)
@@ -223,7 +221,6 @@ class Message(db.Model):
             'receiver_ssl_cert': self.receiver_ssl_cert,
             'created_date': self.created_date,
             'input_data': self.input_data,
-            'input_async_data': self.input_async_data,
             'output_status': self.output_status,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
@@ -285,11 +282,7 @@ class Task(db.Model):
 
     input_data = db.Column(JSONEncodedDict)
 
-    input_async_data = db.Column(JSONEncodedDict)
-
     output_data = db.Column(JSONEncodedDict)
-
-    output_async_data = db.Column(JSONEncodedDict)
 
     reservation_data = db.Column(JSONEncodedDict)
 
@@ -335,10 +328,8 @@ class Task(db.Model):
             'created_date': self.created_date,
             'last_modified_date': self.last_modified_date,
             'input_data': self.input_data,
-            'input_async_data': self.input_async_data,
             'output_data': self.output_data,
             'reservation_data': self.reservation_data,
-            'output_async_data': self.output_async_data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
             'pingback_pending': self.pingback_pending,

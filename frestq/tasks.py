@@ -258,7 +258,6 @@ class SimpleTask(BaseTask):
             action=task_model.action,
             queue=task_model.queue_name,
             data=task_model.input_data,
-            async_data=task_model.input_async_data,
             pingback_date=task_model.pingback_date,
             expiration_date=task_model.expiration_date,
             label=task_model.label
@@ -285,7 +284,6 @@ class SimpleTask(BaseTask):
             'is_local': app.config.get('ROOT_URL') == self.receiver_url,
             'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
             'input_data': self.data,
-            'input_async_data': self.async_data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
             'info_text': self.info_text,
@@ -374,7 +372,6 @@ class SequentialTask(BaseTask):
             'is_local': True,
             'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
             'input_data': dict(),
-            'input_async_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
             'info_text': None,
@@ -449,7 +446,6 @@ class ParallelTask(BaseTask):
             'is_local': True,
             'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
             'input_data': dict(),
-            'input_async_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
             'info_text': None,
@@ -544,7 +540,6 @@ class SynchronizedTask(BaseTask):
             'is_local': True,
             'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
             'input_data': dict(),
-            'input_async_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
             'info_text': None,
@@ -866,7 +861,6 @@ def send_synchronization_message(task_id):
             'queue_name': task.queue_name,
             'pingback_date': task.pingback_date,
             'input_data': task.input_data,
-            'input_async_data': task.input_async_data,
             'expiration_date': task.expiration_date
         },
         "task_id": task.id
@@ -1002,7 +996,6 @@ def send_task_update(task_id):
     Sends to the task creator (which is not us) an update with the task
     information. Currently, the information sent is:
     task.output_data
-    task.output_async_data
     task.output_status
     '''
     logging.debug("SENDING UPDATE to TASK with id %s" % task_id)
@@ -1014,7 +1007,6 @@ def send_task_update(task_id):
         "receiver_ssl_cert": task.sender_ssl_cert,
         "input_data": {
             'output_data': task.output_data,
-            'output_async_data': task.output_async_data,
             'status': task.status
         },
         "task_id": task.id
@@ -1044,10 +1036,6 @@ def update_task(task, task_output):
         commit = True
         task.task_model.output_data = task_output['output_data']
 
-    if 'output_async_data' in task_output:
-        commit = True
-        task.task_model.output_data = task_output['output_async_data']
-
     if 'output_status' in task_output:
         commit = True
         task.task_model.output_data = task_output['output_status']
@@ -1075,7 +1063,6 @@ def post_task(msg, action_handler):
         'is_local': is_local,
         'sender_ssl_cert': msg.sender_ssl_cert,
         'input_data': msg.input_data,
-        'input_async_data': msg.input_async_data,
         'pingback_date': msg.pingback_date,
         'expiration_date': msg.expiration_date,
         'status': 'executing',

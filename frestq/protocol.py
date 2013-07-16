@@ -41,7 +41,7 @@ def update_task(msg):
         # TODO: send back an error update
         return
 
-    keys = ['output_data', 'status', 'output_async_data']
+    keys = ['output_data', 'status']
     for key in keys:
         if key in msg.input_data:
             if isinstance(msg.input_data[key], basestring):
@@ -240,7 +240,6 @@ def synchronize_task(msg):
             'is_local': is_local,
             'sender_ssl_cert': msg.sender_ssl_cert,
             'input_data': msg.input_data['input_data'],
-            'input_async_data': msg.input_data['input_async_data'],
             'pingback_date': msg.input_data['pingback_date'],
             'expiration_date': msg.input_data['expiration_date'],
             'status': 'syncing',
@@ -380,7 +379,6 @@ def director_synchronized_subtask_start(task_id):
             'action': task.action,
             'queue_name': task.queue_name,
             'input_data': task.input_data,
-            'input_async_data': task.input_async_data,
         },
         "task_id": task.id
     }
@@ -403,7 +401,6 @@ def execute_synchronized(msg):
 
     task_instance = ReceiverTask.instance_by_model(task)
     task.input_data = msg.input_data['input_data']
-    task.input_async_data = msg.input_data['input_async_data']
     task.status = "confirmed"
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
