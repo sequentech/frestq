@@ -28,6 +28,20 @@ from . import decorators
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 from .utils import dumps
 
+def certs_differ(cert_a, cert_b):
+    '''
+    Compare certificates
+    '''
+    if cert_a is None:
+        cert_a = u''
+    if cert_b is None:
+        cert_b = u''
+
+    return cert_a != cert_b
+
+class SecurityException(Exception):
+    pass
+
 @decorators.message_action(action="frestq.update_task", queue=INTERNAL_SCHEDULER_NAME)
 def update_task(msg):
     from .app import db
@@ -40,6 +54,10 @@ def update_task(msg):
         # error, cannot update an already finished task (unless it's an error)!
         # TODO: send back an error update
         return
+
+    # invalid update
+    if certs_differ(task.receiver_ssl_cert, msg.sender_ssl_cert):
+        raise  SecurityException()
 
     keys = ['output_data', 'status']
     for key in keys:
@@ -228,6 +246,10 @@ def synchronize_task(msg):
         # TODO: send back an error update
         return
 
+    # invalid update
+    if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
+        raise  SecurityException()
+
     # 1. create received task if needed
     is_local = msg.sender_url == app.config.get('ROOT_URL')
     if not task:
@@ -287,6 +309,10 @@ def director_confirm_task_reservation(msg):
         parent_instance.task_model.status != 'executing':
         # unhandled state
         return
+
+    # invalid update
+    if certs_differ(task.receiver_ssl_cert, msg.sender_ssl_cert):
+        raise  SecurityException()
 
     task.status = 'reserved'
     task.reservation_data = msg.input_data.get('reservation_data', None)
@@ -399,6 +425,10 @@ def execute_synchronized(msg):
         # ERROR!
         return
 
+    # invalid update
+    if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
+        raise  SecurityException()
+
     task_instance = BaseTask.instance_by_model(task)
     task.input_data = msg.input_data['input_data']
     task.status = "confirmed"
@@ -427,6 +457,10 @@ def finish_external_task(msg):
         task_model.sender_url != app.config.get('ROOT_URL'):
         # TODO error management stuff
         return
+
+    # invalid update
+    if certs_differ(task_model.receiver_ssl_cert, msg.sender_ssl_cert):
+        raise  SecurityException()
 
     task = BaseTask.instance_by_model(task_model)
     task_model.output_data = msg.input_data
