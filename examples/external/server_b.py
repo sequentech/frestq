@@ -18,7 +18,7 @@
 
 from frestq import decorators
 from frestq.app import app, run_app
-from frestq.tasks import ExternalTask, ReceiverExternalTask
+from frestq.tasks import ExternalTask
 
 from flask import Blueprint, make_response
 
@@ -54,7 +54,7 @@ approve_api = Blueprint('approve', __name__)
 
 @approve_api.route('/<task_id>', methods=['POST'])
 def approve(task_id):
-    task = ReceiverExternalTask.instance_by_id(task_id)
+    task = ExternalTask.instance_by_id(task_id)
     task.finish(data=dict(yeah="whatever"))
     return make_response("", 200)
 

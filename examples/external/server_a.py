@@ -18,7 +18,7 @@
 
 from flask import Blueprint, make_response
 
-from frestq.tasks import SimpleTask, ReceiverExternalTask
+from frestq.tasks import SimpleTask, ExternalTask
 from frestq.app import app, run_app
 
 # set database uri
@@ -48,7 +48,7 @@ approve_api = Blueprint('approve', __name__)
 
 @approve_api.route('/<task_id>', methods=['POST'])
 def approve(task_id):
-    task = ReceiverExternalTask.instance_by_id(task_id)
+    task = ExternalTask.instance_by_id(task_id)
     task.finish(data=dict(yeah="whatever"))
     return make_response("", 200)
 

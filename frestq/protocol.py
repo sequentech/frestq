@@ -32,7 +32,7 @@ from .utils import dumps
 def update_task(msg):
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask
+    from .tasks import BaseTask
 
     task = msg.task
     logging.debug("UPDATING TASK with id %s" % task.id)
@@ -56,7 +56,7 @@ def update_task(msg):
     db.session.commit()
 
     # do next (it might be a task with a parent task)
-    receiver_task = ReceiverTask.instance_by_model(task)
+    receiver_task = BaseTask.instance_by_model(task)
     receiver_task.execute()
 
 # used to notify reserve threads about events
@@ -70,7 +70,7 @@ def reserve_task(task_id):
     '''
     from .app import db, app
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask, send_task_update
+    from .tasks import BaseTask, send_task_update
 
     # 1. get task and check everything is ok
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
@@ -80,7 +80,7 @@ def reserve_task(task_id):
         return
 
     # 2. generate reservation data
-    task_instance = ReceiverTask.instance_by_model(task)
+    task_instance = BaseTask.instance_by_model(task)
     if task_instance.action_handler_object:
         reservation_data = task_instance.action_handler_object.reserve()
         task.reservation_data = reservation_data
@@ -120,14 +120,14 @@ def reserve_task(task_id):
                 logging.debug("EXECUTING synchronized SUBTASK with id %s, "\
                     "action = %s" % (task.id, task.action))
                 # adapted from the final part of tasks.py:post_task() function
-                from .tasks import ReceiverTask, update_task
+                from .tasks import BaseTask, update_task
                 task_model = task
                 task_model.status = 'executing'
                 task_model.last_modified_date = datetime.utcnow()
                 db.session.add(task_model)
                 db.session.commit()
 
-                task = ReceiverTask.instance_by_model(task_model)
+                task = BaseTask.instance_by_model(task_model)
                 task_output = task.run_action_handler()
                 if task_output:
                     update_task(task, task_output)
@@ -162,11 +162,11 @@ def cancel_reserved_subtask(task_id):
     '''
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask
+    from .tasks import BaseTask
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
 
-    task_instance = ReceiverTask.instance_by_model(task)
+    task_instance = BaseTask.instance_by_model(task)
     # task action_handler_object might not be present, it's not mandatory, and
     # only provided in the task receiver node
     if task_instance.action_handler_object:
@@ -276,10 +276,10 @@ def director_confirm_task_reservation(msg):
     '''
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask, send_synchronization_message
+    from .tasks import BaseTask, send_synchronization_message
 
     task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
-    task_instance = ReceiverTask.instance_by_model(task)
+    task_instance = BaseTask.instance_by_model(task)
     parent_instance = task_instance.get_parent()
 
     # it can be reserved if it's local
@@ -328,10 +328,10 @@ def director_cancel_reserved_subtask(task_id):
     '''
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask
+    from .tasks import BaseTask
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
-    task_instance = ReceiverTask.instance_by_model(task)
+    task_instance = BaseTask.instance_by_model(task)
     task_instance.get_parent().action_handler_object.cancelled_reservation(task_instance)
 
     if task.status != 'reserved':
@@ -392,14 +392,14 @@ def execute_synchronized(msg):
     from .models import Task as ModelTask
     from .api import call_action_handler
     from .fscheduler import FScheduler
-    from .tasks import ReceiverTask, post_task
+    from .tasks import BaseTask, post_task
 
     task = ModelTask.query.get(msg.task_id)
     if task.status != 'reserved':
         # ERROR!
         return
 
-    task_instance = ReceiverTask.instance_by_model(task)
+    task_instance = BaseTask.instance_by_model(task)
     task.input_data = msg.input_data['input_data']
     task.status = "confirmed"
     task.last_modified_date = datetime.utcnow()
@@ -418,7 +418,7 @@ def finish_external_task(msg):
     from .models import Task as ModelTask
     from .api import call_action_handler
     from .fscheduler import FScheduler
-    from .tasks import ReceiverTask, post_task, send_task_update
+    from .tasks import BaseTask, post_task, send_task_update
 
     # get the task model
     task_model = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
@@ -428,7 +428,7 @@ def finish_external_task(msg):
         # TODO error management stuff
         return
 
-    task = ReceiverTask.instance_by_model(task_model)
+    task = BaseTask.instance_by_model(task_model)
     task_model.output_data = msg.input_data
     task_model.status = "finished"
     db.session.add(task_model)

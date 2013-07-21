@@ -42,14 +42,25 @@ class BaseTask(object):
     It has a constructor, and two important functions to be reimplemented:
     create() and send(). Create() actually creates the task in the database and
     send() sends it to the receiver.
-
-    BaseTasks differs from ReceiverTasks in that Receiver tasks are those being
-    executed by a receiver, and because of this they're constructed differently
-    and have a different set of methods.
     '''
+    label = ""
+
+    # set this to true to send an update to the sender
+    send_update_to_sender = False
+
+    # set this to true when you want to automatically finish your task and send
+    # an update to sender with the finished state.
+    auto_finish_after_handler = False
+
+    # reference to the task model
     task_model = None
 
-    label = ""
+    # the action handler for this task, if any
+    action_handler = None
+
+    # the action handler for this task, if action_handler is a class
+    action_handler_object = None
+
 
     def __init__(self):
         super(BaseTask, self).__init__()
@@ -115,7 +126,7 @@ class BaseTask(object):
         elif task_model.task_type == 'sequential':
             return SequentialTask._create_from_model(task_model)
         elif task_model.task_type == 'external':
-            return ExternalTask(task_model)
+            return ExternalTask._create_from_model(task_model)
         elif task_model.task_type == 'parallel':
             return ParallelTask._create_from_model(task_model)
         elif task_model.task_type == 'synchronized':
@@ -212,6 +223,71 @@ class BaseTask(object):
             return None
         return self.instance_by_model(task)
 
+    def _init_from_model(self):
+        '''
+        Init function called by _create_from_model in inherited classes.
+        '''
+        from .action_handlers import ActionHandlers
+        action_handler_data = ActionHandlers.get_action_handler(
+            self.task_model.action, self.task_model.queue_name)
+
+        if action_handler_data:
+            self.action_handler = action_handler_data['handler_func']
+
+        if type(self.action_handler) is types.TypeType:
+            self.action_handler_object = self.action_handler(self)
+
+    def run_action_handler(self):
+        '''
+        Executes action handler if it makes sense and the way it should:
+         * if it's internal, it executes no action handler
+         * if it's an action handler object, calls to its execute function
+         * if it's a function, just calls it
+        '''
+        if self.is_internal():
+            return None
+
+        if self.action_handler_object:
+            return self.action_handler_object.execute()
+        else:
+            return self.action_handler(self)
+
+    @staticmethod
+    def instance_by_id(task_id):
+        '''
+        Given an id, returns the appropiate Task instance. Assumes that the id
+        exists.
+        '''
+        task_model = ModelTask.query.get(task_id)
+        return BaseTask.instance_by_model(task_model)
+
+    def execute(self):
+        '''
+        Function that gets executed after a task's action handler has been
+        executed.
+
+        Handles the finalization of the execution of the task, sending it if it
+        needed to the appropiate party. This function might be called multiple
+        times until the task is finished, so internally it should detect what to
+        do in each case.
+
+        For example, in SequentialTask, it's called after each subtask
+        is completed.
+        '''
+        pass
+
+    def execute_parent(self):
+        '''
+        Executes parent task if there's any.
+        '''
+        # check if there's a parent task, and if so execute() it
+        if not self.task_model.parent_id:
+            return
+
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent_task = BaseTask.instance_by_model(parent)
+        parent_task.execute()
+
 
 class SimpleTask(BaseTask):
     '''
@@ -224,9 +300,7 @@ class SimpleTask(BaseTask):
     It's worth noting that the sender server sees a simple task as only one
     single item, but the receiving server sees it *always* as a sequential task.
     This way the action handler can attach a tree of subtasks to decompose the
-    work to do in a way that is transparent to the sender. Because of this
-    reason, there's no ReceiverSimpleTask implementation, because it's not
-    needed.
+    work to do in a way that is transparent to the sender.
     '''
     receiver_url = None
     action = None
@@ -235,6 +309,8 @@ class SimpleTask(BaseTask):
     info_text = None
     expiration_date = None
     pingback_date = None
+
+    auto_finish_after_handler = True
 
     def __init__(self, receiver_url, action, queue, data=None, label=None,
             info_text=None, pingback_date=None, expiration_date=None):
@@ -267,6 +343,9 @@ class SimpleTask(BaseTask):
             label=task_model.label
        )
         ret.task_model = task_model
+        # local task do not need updates
+        ret.send_update_to_sender = not task_model.is_local
+        ret._init_from_model()
         return ret
 
     def create(self):
@@ -301,6 +380,25 @@ class SimpleTask(BaseTask):
         db.session.commit()
         return self.task_model
 
+    def execute(self):
+        '''
+        Executes the task, sending it to the party that needs to execute.
+        This will trigger the call to the appropiate action handler for this
+        task in the party receiving the task. See the class description for
+        more details behind this behaviour.
+
+        NOTE: If it has a parent task, parent_task.execute() will be called if
+        needed.
+
+        NOTE: When it's a local task, it's also sent, if hasn't been sent yet.
+        '''
+        if self.task_model.status == 'created':
+            logging.debug('SENDING TASK %s' % self.task_model.id)
+            simple_task = SimpleTask._create_from_model(self.task_model)
+            simple_task.send()
+        elif self.task_model.status == "finished":
+            self.execute_parent()
+
 
 class ExternalTask(SimpleTask):
     '''
@@ -324,6 +422,21 @@ class ExternalTask(SimpleTask):
             data=data, label=label, info_text=info_text,
             pingback_date=pingback_date, expiration_date=expiration_date,
             queue=INTERNAL_SCHEDULER_NAME, action="frestq.virtual_empty_task")
+
+    @classmethod
+    def _create_from_model(cls, task_model):
+        ret = cls(
+            receiver_url=task_model.receiver_url,
+            data=task_model.input_data,
+            pingback_date=task_model.pingback_date,
+            expiration_date=task_model.expiration_date,
+            label=task_model.label
+       )
+        ret.task_model = task_model
+        # local task do not need updates
+        ret.send_update_to_sender = not task_model.is_local
+        ret._init_from_model()
+        return ret
 
     def create(self):
         '''
@@ -356,6 +469,21 @@ class ExternalTask(SimpleTask):
         db.session.commit()
         return self.task_model
 
+    def finish(self, data=None):
+        '''
+        Sets the task as finishes and executes the next task if any
+        '''
+        logging.debug("SENDING FINISH MESSAGE to EXTERNAL SUBTASK with id %s" % self.task_model.id)
+        msg_data = {
+            "action": "frestq.finish_external_task",
+            "queue_name": INTERNAL_SCHEDULER_NAME,
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': self.task_model.receiver_url,
+            'input_data': data,
+            'task_id': self.task_model.id
+        }
+        send_message(msg_data)
+
 
 class SequentialTask(BaseTask):
     '''
@@ -371,7 +499,7 @@ class SequentialTask(BaseTask):
     properly.
 
     NOTE: When you send a SimpleTask to a receiver, the receiver sees it as a
-    ReceiverSequentialTask.
+    SequentialTask. This is the way we support distributed task composition.
     '''
     _subtasks = []
 
@@ -387,6 +515,7 @@ class SequentialTask(BaseTask):
     def _create_from_model(cls, task_model):
         ret = cls()
         ret.task_model = task_model
+        ret._init_from_model()
         return ret
 
     def add(self, subtask):
@@ -452,6 +581,54 @@ class SequentialTask(BaseTask):
         db.session.commit()
         return self.task_model
 
+    def next_subtask(self):
+        '''
+        Returns next subtask if any or None
+        '''
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
+            filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
+
+    def execute(self):
+        '''
+        After executing the task handler, this funcion is called once per each
+        subtask, and executes each subtask sequentally and in order
+        '''
+        next_subtask_model = self.next_subtask()
+
+        # check if there's no subtask left to do, and send the do next signal
+        # for parent task if it has one, and send the finished update to the
+        # sender if it's not local
+        if not next_subtask_model:
+            self.task_model.status = "finished"
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # update the sender if any
+            if not self.task_model.is_local:
+                sched = FScheduler.get_scheduler(self.task_model.queue_name)
+                sched.add_now_job(send_task_update, [self.task_model.id])
+
+
+            # check if there's a parent task, and if so execute() it
+            self.execute_parent()
+            return
+
+        if next_subtask_model.status in ['sent', 'executing', 'error']:
+            return
+
+        # execute next subtask
+        next_subtask = BaseTask.instance_by_model(next_subtask_model)
+        next_subtask.execute()
+
+
+def execute_task(task_id):
+    '''
+    Used to execute a task asynchronously
+    '''
+    task_model = db.session.query(ModelTask).get(task_id)
+    task = BaseTask.instance_by_model(task_model)
+    task.execute()
+
 
 class ParallelTask(BaseTask):
     '''
@@ -471,6 +648,7 @@ class ParallelTask(BaseTask):
     def _create_from_model(cls, task_model):
         ret = cls()
         ret.task_model = task_model
+        ret._init_from_model()
         return ret
 
     def add(self, subtask):
@@ -524,360 +702,6 @@ class ParallelTask(BaseTask):
         db.session.add(self.task_model)
         db.session.commit()
         return self.task_model
-
-
-class SynchronizedTask(BaseTask):
-    '''
-    Executes subtasks at the same time/synchronized. Before the subtasks are
-    executed, some synchronization messages are sent to transparently assure
-    that all the receivers are able to launch at the same time their respective
-    tasks.
-
-    The user of this task can take advantage of these synchronization messages
-    by specifying an sychronization_handler, which will be executed exactly
-    before the subtask will.
-    This will allow to process the synchronization information recopilated from
-    subtasks. In turn, subtasks can send this sychronization information
-    specifying a task decorator parameter called "synchronization_handler".
-
-    See sychronization example for more details on how this works.
-    '''
-    _subtasks = []
-
-    handler = None
-
-    def __init__(self, label="", handler=None):
-        '''
-        Constructor, takes no arguments as it is a virtual task.
-        '''
-        super(SynchronizedTask, self).__init__()
-        self._subtasks = []
-        self.label = label
-        self.handler = handler
-
-    @classmethod
-    def _create_from_model(cls, task_model):
-        ret = cls()
-        ret.task_model = task_model
-        return ret
-
-    def add(self, subtask):
-        '''
-        Adds a subtask.
-        '''
-        if not self.task_model:
-            self._subtasks.append(subtask)
-            return
-
-        model = subtask.create()
-        model.parent_id = self.task_model.id
-        db.session.add(model)
-        db.session.commit()
-
-    def create(self):
-        '''
-        Create the task in the DB and returns the model, creating any previously
-        added subtasks.
-        '''
-
-        # create task
-        task_id = str(uuid4())
-        logging.debug('CREATE local SYNCHRONIZED TASK with ID %s' % task_id)
-
-        if self.handler:
-            action = self.handler.action
-        else:
-            action = 'frestq.virtual_empty_task'
-
-        kwargs = {
-            'action': action,
-            'queue_name': INTERNAL_SCHEDULER_NAME,
-            'label': self.label,
-            'sender_url': app.config.get('ROOT_URL'),
-            'receiver_url': app.config.get('ROOT_URL'),
-            'is_received': False,
-            'is_local': True,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
-            'input_data': dict(),
-            'pingback_date': None,
-            'expiration_date': None,
-            'info_text': None,
-            'id': task_id,
-            'status': 'created',
-            'task_type': 'synchronized',
-            'parent_id': None
-        }
-        self.task_model = ModelTask(**kwargs)
-        # create also subtasks
-        i = 0
-        for subtask in self._subtasks:
-            subtask_model = subtask.create()
-            subtask_model.parent_id = self.task_model.id
-            db.session.add(subtask_model)
-            i += 1
-        db.session.add(self.task_model)
-        db.session.commit()
-        return self.task_model
-
-
-class ReceiverTask(BaseTask):
-    '''
-    Base class used for executing task being received in a frestq server.
-    '''
-    # set this to true to send an update to the sender
-    send_update_to_sender = False
-
-    # set this to true when you want to automatically finish your task and send
-    # an update to sender with the finished state.
-    auto_finish_after_handler = False
-
-    # reference to the task model
-    task_model = None
-
-    # the action handler for this task, if any
-    action_handler = None
-
-    # the action handler for this task, if action_handler is a class
-    action_handler_object = None
-
-    def __init__(self, task_model):
-        super(ReceiverTask, self).__init__()
-        self.task_model = task_model
-
-        from .action_handlers import ActionHandlers
-        action_handler_data = ActionHandlers.get_action_handler(
-            task_model.action, task_model.queue_name)
-
-        if action_handler_data:
-            self.action_handler = action_handler_data['handler_func']
-
-        if type(self.action_handler) is types.TypeType:
-            self.action_handler_object = self.action_handler(self)
-
-    def run_action_handler(self):
-        if self.is_internal():
-            return None
-
-        if self.action_handler_object:
-            return self.action_handler_object.execute()
-        else:
-            return self.action_handler(self)
-
-    @staticmethod
-    def instance_by_id(task_id):
-        task_model = ModelTask.query.get(task_id)
-        return ReceiverTask.instance_by_model(task_model)
-
-    @staticmethod
-    def instance_by_model(task_model):
-        '''
-        This is a factory pattern
-        '''
-        if task_model.task_type == 'simple':
-            return ReceiverSimpleTask(task_model)
-        elif task_model.task_type == 'external':
-            return ReceiverExternalTask(task_model)
-        elif task_model.task_type == 'sequential':
-            return ReceiverSequentialTask(task_model)
-        elif task_model.task_type == 'parallel':
-            return ReceiverParallelTask(task_model)
-        elif task_model.task_type == 'synchronized':
-            return ReceiverSynchronizedTask(task_model)
-        else:
-            raise Exception('unknown %s task type' % task_model.task_type)
-
-    def execute(self):
-        '''
-        Function that gets executed after a task's action handler has been
-        executed.
-
-        Handles the finalization of the execution of the task, sending it if it
-        needed to the appropiate party. This function might be called multiple
-        times until the task is finished, so internally it should detect what to
-        do in each case.
-
-        For example, in ReceiverSequentialTask, it's called after each subtask
-        is completed.
-        '''
-        pass
-
-    def execute_parent(self):
-        '''
-        Executes parent task if there's any.
-        '''
-        # check if there's a parent task, and if so execute() it
-        if not self.task_model.parent_id:
-            return
-
-        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
-        parent_task = ReceiverTask.instance_by_model(parent)
-        parent_task.execute()
-
-
-class ReceiverSimpleTask(ReceiverTask):
-    '''
-    Represents a simple task when being about to be executed in the receiver.
-
-    Because simple tasks are converted into sequential tasks in the receiver,
-    one would think that this task should not exist (because in the receiver
-    the task would be instanced as ReceiverSequentialTask).
-
-    But this is not true because in virtual receiver tasks
-    (ReceiverSequentialTask for example), their execute() function instantiate
-    the receiver class for each subtask and call to execute each of them. This
-    is done instead of sending each subtask because some of those subtasks
-    can be virtual and thus cannot be sent, so what we do is that the execute
-    function of ReceiverSimpleTask sends the task to the receiver (and then
-    the task will be instantiated as a ReceiverSequentialTask).
-    '''
-    auto_finish_after_handler = True
-
-    def __init__(self, task_model):
-        super(ReceiverSimpleTask, self).__init__(task_model)
-        # local task do not need updates
-        self.send_update_to_sender = not task_model.is_local
-
-    def execute(self):
-        '''
-        Executes the task, sending it to the party that needs to execute.
-        This will trigger the call to the appropiate action handler for this
-        task in the party receiving the task. See the class description for
-        more details behind this behaviour.
-
-        NOTE: If it has a parent task, parent_task.execute() will be called if
-        needed.
-
-        NOTE: When it's a local task, it's also sent, if hasn't been sent yet.
-        '''
-        if self.task_model.status == 'created':
-            logging.debug('SENDING simple TASK %s' % self.task_model.id)
-            simple_task = SimpleTask._create_from_model(self.task_model)
-            simple_task.send()
-        elif self.task_model.status == "finished":
-            self.execute_parent()
-
-
-class ReceiverExternalTask(ReceiverSimpleTask):
-
-    def __init__(self, task_model):
-        super(ReceiverExternalTask, self).__init__(task_model)
-
-    def finish(self, data=None):
-        '''
-        Sets the task as finishes and executes the next task if any
-        '''
-        logging.debug("SENDING FINISH MESSAGE to EXTERNAL SUBTASK with id %s" % self.task_model.id)
-        msg_data = {
-            "action": "frestq.finish_external_task",
-            "queue_name": INTERNAL_SCHEDULER_NAME,
-            'sender_url': app.config.get('ROOT_URL'),
-            'receiver_url': self.task_model.receiver_url,
-            'input_data': data,
-            'task_id': self.task_model.id
-        }
-        send_message(msg_data)
-
-class ReceiverSequentialTask(ReceiverTask):
-    '''
-    Sequential task executed when received by a frestq node.
-    You can easily add subtasks with add() method. Each subtask are executed
-    sequentially and in order.
-
-    Subtasks will begin to be processed asynchronously when execute() function
-    is called.
-    '''
-
-    def __init__(self, task_model):
-        super(ReceiverSequentialTask, self).__init__(task_model)
-
-    def add(self, subtask):
-        '''
-        Add a subtask. Subtasks will be executed in chronological adding order.
-
-        For subtask, supported types are:
-         * SimpleTask
-        '''
-        model = subtask.create()
-        model.order = self._count_subtasks()
-        model.parent_id = self.task_model.id
-        db.session.add(model)
-        db.session.commit()
-
-    def _count_subtasks(self):
-        '''
-        Count the number of subtasks
-        '''
-        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").count()
-
-    def next_subtask(self):
-        '''
-        Returns next subtask if any or None
-        '''
-        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
-            filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
-
-    def execute(self):
-        '''
-        After executing the task handler, this funcion is called once per each
-        subtask, and executes each subtask sequentally and in order
-        '''
-        next_subtask_model = self.next_subtask()
-
-        # check if there's no subtask left to do, and send the do next signal
-        # for parent task if it has one, and send the finished update to the
-        # sender if it's not local
-        if not next_subtask_model:
-            self.task_model.status = "finished"
-            db.session.add(self.task_model)
-            db.session.commit()
-
-            # update the sender if any
-            if not self.task_model.is_local:
-                sched = FScheduler.get_scheduler(self.task_model.queue_name)
-                sched.add_now_job(send_task_update, [self.task_model.id])
-
-
-            # check if there's a parent task, and if so execute() it
-            self.execute_parent()
-            return
-
-        if next_subtask_model.status in ['sent', 'executing', 'error']:
-            return
-
-        # execute next subtask
-        next_subtask = ReceiverTask.instance_by_model(next_subtask_model)
-        next_subtask.execute()
-
-
-def execute_task(task_id):
-    '''
-    Used to execute a task asynchronously
-    '''
-    task_model = db.session.query(ModelTask).get(task_id)
-    task = ReceiverTask.instance_by_model(task_model)
-    task.execute()
-
-
-class ReceiverParallelTask(ReceiverTask):
-    '''
-    Similar to ReceiverSequentialTask, but all subtasks are executed in
-    parallel. This task only ends when all the subtasks end.
-    '''
-
-    def __init__(self, task_model):
-        super(ReceiverParallelTask, self).__init__(task_model)
-
-    def add(self, subtask):
-        '''
-        Add a subtask. Subtasks will be executed in chronological adding order.
-
-        For subtask, supported types are:
-         * SimpleTask
-        '''
-        model = subtask.create()
-        model.parent_id = self.task_model.id
-        db.session.add(model)
-        db.session.commit()
 
     def count_unfinished_subtasks(self):
         '''
@@ -956,19 +780,101 @@ def send_synchronization_message(task_id):
     db.session.add(task)
     db.session.commit()
 
-class ReceiverSynchronizedTask(ReceiverTask):
+
+
+class SynchronizedTask(BaseTask):
     '''
-    Similar to ReceiverParallelTask, but all subtasks are executed
-    synchronously. This task only ends when all the subtasks end.
+    Executes subtasks at the same time/synchronized. Before the subtasks are
+    executed, some synchronization messages are sent to transparently assure
+    that all the receivers are able to launch at the same time their respective
+    tasks.
 
-    The status of a successful synchronized task usually goes like this:
-    created > executing > finished
+    The user of this task can take advantage of these synchronization messages
+    by specifying an sychronization_handler, which will be executed exactly
+    before the subtask will.
+    This will allow to process the synchronization information recopilated from
+    subtasks. In turn, subtasks can send this sychronization information
+    specifying a task decorator parameter called "synchronization_handler".
 
-    The synchronization messages for a single task are sent in the sent period.
+    See sychronization example for more details on how this works.
     '''
+    _subtasks = []
 
-    def __init__(self, task_model):
-        super(ReceiverSynchronizedTask, self).__init__(task_model)
+    handler = None
+
+    def __init__(self, label="", handler=None):
+        '''
+        Constructor, takes no arguments as it is a virtual task.
+        '''
+        super(SynchronizedTask, self).__init__()
+        self._subtasks = []
+        self.label = label
+        self.handler = handler
+
+    @classmethod
+    def _create_from_model(cls, task_model):
+        ret = cls()
+        ret.task_model = task_model
+        ret._init_from_model()
+        return ret
+
+    def add(self, subtask):
+        '''
+        Adds a subtask.
+        '''
+        if not self.task_model:
+            self._subtasks.append(subtask)
+            return
+
+        model = subtask.create()
+        model.parent_id = self.task_model.id
+        db.session.add(model)
+        db.session.commit()
+
+    def create(self):
+        '''
+        Create the task in the DB and returns the model, creating any previously
+        added subtasks.
+        '''
+
+        # create task
+        task_id = str(uuid4())
+        logging.debug('CREATE local SYNCHRONIZED TASK with ID %s' % task_id)
+
+        if self.handler:
+            action = self.handler.action
+        else:
+            action = 'frestq.virtual_empty_task'
+
+        kwargs = {
+            'action': action,
+            'queue_name': INTERNAL_SCHEDULER_NAME,
+            'label': self.label,
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': app.config.get('ROOT_URL'),
+            'is_received': False,
+            'is_local': True,
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'input_data': dict(),
+            'pingback_date': None,
+            'expiration_date': None,
+            'info_text': None,
+            'id': task_id,
+            'status': 'created',
+            'task_type': 'synchronized',
+            'parent_id': None
+        }
+        self.task_model = ModelTask(**kwargs)
+        # create also subtasks
+        i = 0
+        for subtask in self._subtasks:
+            subtask_model = subtask.create()
+            subtask_model.parent_id = self.task_model.id
+            db.session.add(subtask_model)
+            i += 1
+        db.session.add(self.task_model)
+        db.session.commit()
+        return self.task_model
 
     def count_unfinished_subtasks(self):
         '''
@@ -1023,6 +929,7 @@ class ReceiverSynchronizedTask(ReceiverTask):
 
         # check if there's a parent task, and if so execute() it
         self.execute_parent()
+
 
 def send_message(msg_data):
     '''
@@ -1106,7 +1013,7 @@ def send_task_update(task_id):
     # task finished. check if there's a parent task, and if so execute() it
     if task.parent_id:
         parent = db.session.query(ModelTask).get(task.parent_id)
-        parent_task = ReceiverTask.instance_by_model(parent)
+        parent_task = BaseTask.instance_by_model(parent)
         parent_task.execute()
 
 def update_task(task, task_output):
@@ -1178,7 +1085,7 @@ def post_task(msg, action_handler):
         db.session.commit()
 
     # 2. call to the handler
-    task = ReceiverTask.instance_by_model(task_model)
+    task = BaseTask.instance_by_model(task_model)
     task_output = task.run_action_handler()
     if task_output:
         update_task(task, task_output)
