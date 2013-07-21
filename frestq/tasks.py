@@ -101,6 +101,11 @@ class BaseTask(object):
         return copy.deepcopy(self.task_model.to_dict())
 
     @staticmethod
+    def instance_by_id(task_id):
+        task_model = ModelTask.query.get(task_id)
+        return BaseTask.instance_by_model(task_model)
+
+    @staticmethod
     def instance_by_model(task_model):
         '''
         This is a factory pattern
@@ -109,6 +114,8 @@ class BaseTask(object):
             return SimpleTask._create_from_model(task_model)
         elif task_model.task_type == 'sequential':
             return SequentialTask._create_from_model(task_model)
+        elif task_model.task_type == 'external':
+            return ExternalTask(task_model)
         elif task_model.task_type == 'parallel':
             return ParallelTask._create_from_model(task_model)
         elif task_model.task_type == 'synchronized':
@@ -225,14 +232,12 @@ class SimpleTask(BaseTask):
     action = None
     queue = None
     data = None
-    async_data = None
     info_text = None
     expiration_date = None
     pingback_date = None
 
     def __init__(self, receiver_url, action, queue, data=None, label=None,
-            async_data=None, info_text=None, pingback_date=None,
-            expiration_date=None):
+            info_text=None, pingback_date=None, expiration_date=None):
         '''
         Constructor of a simple tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -246,7 +251,6 @@ class SimpleTask(BaseTask):
         self.action = action
         self.data = data
         self.queue = queue
-        self.async_data = async_data
         self.info_text = info_text
         self.expiration_date = expiration_date
         self.pingback_date = pingback_date
@@ -290,6 +294,61 @@ class SimpleTask(BaseTask):
             'id': task_id,
             'status': 'created',
             'task_type': 'simple',
+            'parent_id': None
+        }
+        self.task_model = ModelTask(**kwargs)
+        db.session.add(self.task_model)
+        db.session.commit()
+        return self.task_model
+
+
+class ExternalTask(SimpleTask):
+    '''
+    Represents a task that requires external asynchronous input.
+
+    A typical example is a task that requires user input. This kind of task
+    doesn't execute any code, it just keep in "executing" state until you
+    manually change the state to "finished" with finish()
+    '''
+
+    def __init__(self, receiver_url, data=None, label=None,
+            info_text=None, pingback_date=None, expiration_date=None):
+        '''
+        Constructor of a external tasks. It takes as input all the information
+        needed to send the single task to the receiver end.
+
+        Note: to save the task in the database of the sender you need to call
+        to create(), and to send it to the receiver, call to send().
+        '''
+        super(ExternalTask, self).__init__(receiver_url=receiver_url,
+            data=data, label=label, info_text=info_text,
+            pingback_date=pingback_date, expiration_date=expiration_date,
+            queue=INTERNAL_SCHEDULER_NAME, action="frestq.virtual_empty_task")
+
+    def create(self):
+        '''
+        Create the external task in the DB and returns the model.
+        '''
+
+        # create task
+        task_id = str(uuid4())
+        logging.debug('CREATE EXTERNAL TASK with ID %s' % task_id)
+        kwargs = {
+            'action': 'frestq.virtual_empty_task',
+            'queue_name': INTERNAL_SCHEDULER_NAME,
+            'label': self.label,
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': self.receiver_url,
+            'is_received': False,
+            'is_local': app.config.get('ROOT_URL') == self.receiver_url,
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'input_data': self.data,
+            'pingback_date': self.pingback_date,
+            'expiration_date': self.expiration_date,
+            'info_text': self.info_text,
+            'id': task_id,
+            'status': 'created',
+            'task_type': 'external',
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
@@ -605,12 +664,19 @@ class ReceiverTask(BaseTask):
             return self.action_handler(self)
 
     @staticmethod
+    def instance_by_id(task_id):
+        task_model = ModelTask.query.get(task_id)
+        return ReceiverTask.instance_by_model(task_model)
+
+    @staticmethod
     def instance_by_model(task_model):
         '''
         This is a factory pattern
         '''
         if task_model.task_type == 'simple':
             return ReceiverSimpleTask(task_model)
+        elif task_model.task_type == 'external':
+            return ReceiverExternalTask(task_model)
         elif task_model.task_type == 'sequential':
             return ReceiverSequentialTask(task_model)
         elif task_model.task_type == 'parallel':
@@ -690,6 +756,26 @@ class ReceiverSimpleTask(ReceiverTask):
         elif self.task_model.status == "finished":
             self.execute_parent()
 
+
+class ReceiverExternalTask(ReceiverSimpleTask):
+
+    def __init__(self, task_model):
+        super(ReceiverExternalTask, self).__init__(task_model)
+
+    def finish(self, data=None):
+        '''
+        Sets the task as finishes and executes the next task if any
+        '''
+        logging.debug("SENDING FINISH MESSAGE to EXTERNAL SUBTASK with id %s" % self.task_model.id)
+        msg_data = {
+            "action": "frestq.finish_external_task",
+            "queue_name": INTERNAL_SCHEDULER_NAME,
+            'sender_url': app.config.get('ROOT_URL'),
+            'receiver_url': self.task_model.receiver_url,
+            'input_data': data,
+            'task_id': self.task_model.id
+        }
+        send_message(msg_data)
 
 class ReceiverSequentialTask(ReceiverTask):
     '''
@@ -1105,7 +1191,7 @@ def post_task(msg, action_handler):
 
     if task.send_update_to_sender:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-        sched.add_now_job(send_task_update, [task_model.id, task_output])
+        sched.add_now_job(send_task_update, [task_model.id])
 
     # 4. execute the task synchronously
     #

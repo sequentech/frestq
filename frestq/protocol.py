@@ -70,7 +70,7 @@ def reserve_task(task_id):
     '''
     from .app import db, app
     from .models import Task as ModelTask
-    from .tasks import ReceiverTask
+    from .tasks import ReceiverTask, send_task_update
 
     # 1. get task and check everything is ok
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
@@ -141,7 +141,7 @@ def reserve_task(task_id):
 
                 if task.send_update_to_sender:
                     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-                    sched.add_now_job(send_task_update, [task_model.id, task_output])
+                    sched.add_now_job(send_task_update, [task_model.id])
 
                 # 8. execute the task synchronously
                 #
@@ -407,3 +407,36 @@ def execute_synchronized(msg):
     db.session.commit()
     with _reserve_condition:
         _reserve_condition.notify_all()
+
+
+@decorators.message_action(action="frestq.finish_external_task", queue=INTERNAL_SCHEDULER_NAME)
+def finish_external_task(msg):
+    '''
+    marks as finished an external task. This will let the task flow continue
+    '''
+    from .app import db, app
+    from .models import Task as ModelTask
+    from .api import call_action_handler
+    from .fscheduler import FScheduler
+    from .tasks import ReceiverTask, post_task, send_task_update
+
+    # get the task model
+    task_model = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    if not task_model or task_model.task_type != "external" or\
+        task_model.status != 'sent' or\
+        task_model.sender_url != app.config.get('ROOT_URL'):
+        # TODO error management stuff
+        return
+
+    task = ReceiverTask.instance_by_model(task_model)
+    task_model.output_data = msg.input_data
+    task_model.status = "finished"
+    db.session.add(task_model)
+    db.session.commit()
+
+    if task.send_update_to_sender:
+        sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
+        sched.add_now_job(send_task_update, [task_model.id])
+
+    # spawns next task in the row
+    task.execute()
