@@ -105,11 +105,29 @@ class BaseTask(object):
 
         send_message(msg_data)
 
+    def set_reservation_data(self, data):
+        '''
+        Sets reservation data
+        '''
+        self.task_model.reservation_data = data
+
+    def get_reservation_data(self):
+        '''
+        Returns reservation data
+        '''
+        return self.task_model.reservation_data
+
     def get_data(self):
         '''
         Returns public task data available to the user
         '''
         return copy.deepcopy(self.task_model.to_dict())
+
+    def set_output_data(self, data):
+        '''
+        Setter of a task's output data
+        '''
+        self.task_model.output_data = data
 
     @staticmethod
     def instance_by_id(task_id):

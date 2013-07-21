@@ -100,8 +100,7 @@ def reserve_task(task_id):
     # 2. generate reservation data
     task_instance = BaseTask.instance_by_model(task)
     if task_instance.action_handler_object:
-        reservation_data = task_instance.action_handler_object.reserve()
-        task.reservation_data = reservation_data
+        task_instance.action_handler_object.reserve()
 
     # 3. send reserved message to sender
     task.status = 'reserved'
@@ -246,10 +245,6 @@ def synchronize_task(msg):
         # TODO: send back an error update
         return
 
-    # invalid update
-    if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
-        raise  SecurityException()
-
     # 1. create received task if needed
     is_local = msg.sender_url == app.config.get('ROOT_URL')
     if not task:
@@ -272,6 +267,8 @@ def synchronize_task(msg):
         db.session.add(task)
         db.session.commit()
     else:
+        if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
+            raise  SecurityException()
         if is_local and task.task_type == 'simple':
             # this could happen if the task was created with SimpleTask
             task.task_type = 'sequential'

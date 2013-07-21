@@ -47,13 +47,6 @@ QUEUES_OPTIONS = {
 
 BYEBYE_PORT_RANGE=[6000,6003]
 
-# action handler:
-
-def goodbye_sync_handler(task):
-
-    port = subtask.get_data()['sync_output_data']['port']
-    parent = subtask.get_parent()
-    return dict
 
 @decorators.internal_task(name="synchronized_goodbye")
 class SynchronizedGoodbyeHandler(SynchronizedTaskHandler):
@@ -64,6 +57,7 @@ class SynchronizedGoodbyeHandler(SynchronizedTaskHandler):
         '''
         subtask_id = subtask.get_data()["id"]
         reservation_data = subtask.get_data()["reservation_data"]
+        ## TODO: create a set_reservation_data(subtask_id, data) to use it here
         if not isinstance(self.task.task_model.reservation_data, dict):
             self.task.task_model.reservation_data = dict()
 

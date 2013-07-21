@@ -39,18 +39,17 @@ class GoodbyeCruelWorldHandler(SynchronizedSubtaskHandler):
                     _byebye_ports.append(port)
                     break
 
-        # sets self.task.get_data()['reservation_data'], which gets sent to sender
-        return dict(port=port)
+        self.task.set_reservation_data(dict(port=port))
 
     def cancel_reservation(self):
-        port = self.task.get_data()['reservation_data']
+        port = self.task.get_reservation_data()['port']
         with _byebyes_lock:
             if port in _byebye_ports:
                 _byebye_ports.remove(port)
 
     def execute(self):
         username = self.task.get_data()['input_data']['username']
-        print "our reservation: ", dumps(self.task.get_data()['reservation_data'])
+        print "our reservation: ", dumps(self.task.get_reservation_data())
         print "others reservation: ", dumps(self.task.get_data()['input_data'])
 
         print "woke up! time to finish =)\n"
@@ -59,11 +58,8 @@ class GoodbyeCruelWorldHandler(SynchronizedSubtaskHandler):
         # free the port
         self.cancel_reservation()
 
-        # set task.get_data()['output_data'] which will be transmitted to task sender
-        return dict(
-            output_data = "goodbye %s from port %d in server %s!" % (
-                username,
-                self.task.get_data()['reservation_data']['port'],
-                app.config.get('SERVER_NAME')
-            )
-        )
+        self.task.set_output_data("goodbye %s from port %d in server %s!" % (
+            username,
+            self.task.get_reservation_data()['port'],
+            app.config.get('SERVER_NAME')
+        ))
