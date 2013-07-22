@@ -20,6 +20,8 @@ from __future__ import unicode_literals
 import datetime
 import json
 
+from prettytable import PrettyTable
+
 __all__ = ['dumps', 'loads']
 
 class JSONDateTimeEncoder(json.JSONEncoder):
@@ -50,7 +52,33 @@ def datetime_decoder(d):
         return dict(result)
 
 def dumps(obj):
+    '''
+    dumps that also decodes datetimes
+    '''
     return json.dumps(obj, cls=JSONDateTimeEncoder)
 
 def loads(obj):
+    '''
+    loads that also encodes datetimes
+    '''
     return json.loads(obj, object_hook=datetime_decoder)
+
+def list_tasks(args):
+    from .app import db
+    from .models import Task
+    tasks = db.session.query(Task).order_by(Task.created_date.desc()).limit(args.limit)
+    table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'status', 'created_date'])
+    for task in tasks:
+        table.add_row([str(task.id)[:8], task.sender_url, task.action, task.queue_name,
+                       task.status, task.created_date])
+    print table
+
+def list_messages(args):
+    from .app import db
+    from .models import Message
+    msgs = db.session.query(Message).order_by(Message.created_date.desc()).limit(args.limit)
+    table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'created_date', 'input_data'])
+    for msg in msgs:
+        table.add_row([str(msg.id)[:8], msg.sender_url, msg.action, msg.queue_name,
+                       msg.created_date, str(msg.input_data)[:30]])
+    print table

@@ -3,3 +3,4 @@ flask-sqlalchemy
 hg+https://edulix@bitbucket.org/edulix/apscheduler
 ipdb
 requests
+prettytable

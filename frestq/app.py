@@ -67,19 +67,36 @@ from .api import api
 app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
+from .utils import list_messages, list_tasks
 
 def run_app(config_object=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--createdb", help="create the database", action="store_true")
+    parser.add_argument("--messages", help="list last messages", action="store_true")
+    parser.add_argument("--tasks", help="list last tasks", action="store_true")
+    parser.add_argument("-n", "--limit", help="limit number of results",
+                        type=int, default=20)
     args = parser.parse_args()
     app.config.from_object(__name__)
     if config_object:
         app.config.from_object(config_object)
     app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
 
+    if args.limit < 1:
+        print "limit must be >= 1"
+        return
+
     if args.createdb:
         print "creating the database"
         db.create_all()
+        return
+
+    if args.messages:
+        list_messages(args)
+        return
+
+    if args.tasks:
+        list_tasks(args)
         return
 
     FScheduler.start_all_schedulers()
