@@ -1,6 +1,7 @@
 flask
 flask-sqlalchemy
-hg+https://edulix@bitbucket.org/edulix/apscheduler
+hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler
 ipdb
 requests
 prettytable
+pyopenssl
