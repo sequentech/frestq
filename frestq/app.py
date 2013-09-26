@@ -26,7 +26,82 @@ from flask.ext.sqlalchemy import SQLAlchemy
 
 logging.basicConfig(level=logging.DEBUG)
 
-app = Flask(__name__)
+class FrestqApp(Flask):
+    def __init__(self, *args, **kwargs):
+        super(FrestqApp, self).__init__(*args, **kwargs)
+
+    def configure_app(self, config_object=None):
+        '''
+        Configures the application. It's intended to do everything to be able to
+        run the application except calling app.run, so that it can be reused when
+        using gunicorn or similar.
+        '''
+        self.config.from_object(__name__)
+        if config_object:
+            self.config.from_object(config_object)
+        self.config.from_envvar('FRESTQ_SETTINGS', silent=True)
+
+        # store cert in
+        if self.config.get('SSL_CERT_PATH', None) and\
+            self.config.get('SSL_KEY_PATH', None):
+
+            with open(self.config.get('SSL_CERT_PATH', ''), 'r') as f:
+                self.config['SSL_CERT_STRING'] = f.read()
+        else:
+            self.config['SSL_CERT_STRING'] = ''
+            logging.warning("You are NOT using SSL in this instance")
+        FScheduler.start_all_schedulers()
+
+    def run(self, *args, **kwargs):
+        '''
+        Reimplemented the run function.
+
+        parse_args can be provided if you want yo parse the app arguments
+        '''
+        if kwargs.get('parse_args', False):
+            # remove parse_args as it's not recognized by super
+            del kwargs['parse_args']
+
+            parser = argparse.ArgumentParser()
+            parser.add_argument("--createdb", help="create the database", action="store_true")
+            parser.add_argument("--messages", help="list last messages", action="store_true")
+            parser.add_argument("--tasks", help="list last tasks", action="store_true")
+            parser.add_argument("-n", "--limit", help="limit number of results",
+                                type=int, default=20)
+            pargs = parser.parse_args()
+
+            if pargs.limit < 1:
+                print "limit must be >= 1"
+                return
+
+            if pargs.createdb:
+                print "creating the database"
+                db.create_all()
+                return
+
+            if pargs.messages:
+                list_messages(pargs)
+                return
+
+            if pargs.tasks:
+                list_tasks(pargs)
+                return
+
+        # ignore these threaded or use_reloader, we force those two
+        if 'threaded' in kwargs:
+            print "threaded provided but ignored (always set to True): ", kwargs['threaded']
+            del kwargs['threaded']
+        if 'use_reloader' in kwargs:
+            print "use_reloader provided but ignored (always set to True): ", kwargs['use_reloader']
+            del kwargs['use_reloader']
+
+        if 'port' not in kwargs:
+            kwargs['port'] = app.config.get('SERVER_PORT', None)
+
+        return super(FrestqApp, self).run(threaded=True, use_reloader=False,
+                                          *args, **kwargs)
+
+app = FrestqApp(__name__)
 
 ### configuration
 
@@ -37,8 +112,9 @@ DEBUG = True
 # example: sqlite:////absolute/path/to/db.sqlite
 SQLALCHEMY_DATABASE_URI = ''
 
-# own certificate, empty if there isn't any
-SSL_CERT_STRING = ''
+# own certificate, None if there isn't any
+SSL_CERT_PATH = None
+SSL_KEY_PATH = None
 
 # queues root url
 ROOT_URL = 'http://127.0.0.1:5000/api/queues'
@@ -46,8 +122,13 @@ ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 # time a thread can be reserved in for synchronization purposes. In seconds.
 RESERVATION_TIMEOUT = 60
 
+app.config.from_object(__name__)
+
 # boostrap our little application
 db = SQLAlchemy(app)
+
+# set to True to get real security
+ALLOW_ONLY_SSL_CONNECTIONS = False
 
 # options for each queue. example:
 #QUEUES_OPTIONS = {
@@ -69,38 +150,5 @@ app.register_blueprint(api, url_prefix='/api')
 from . import protocol
 from .utils import list_messages, list_tasks
 
-def run_app(config_object=None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--createdb", help="create the database", action="store_true")
-    parser.add_argument("--messages", help="list last messages", action="store_true")
-    parser.add_argument("--tasks", help="list last tasks", action="store_true")
-    parser.add_argument("-n", "--limit", help="limit number of results",
-                        type=int, default=20)
-    args = parser.parse_args()
-    app.config.from_object(__name__)
-    if config_object:
-        app.config.from_object(config_object)
-    app.config.from_envvar('FRESTQ_SETTINGS', silent=True)
-
-    if args.limit < 1:
-        print "limit must be >= 1"
-        return
-
-    if args.createdb:
-        print "creating the database"
-        db.create_all()
-        return
-
-    if args.messages:
-        list_messages(args)
-        return
-
-    if args.tasks:
-        list_tasks(args)
-        return
-
-    FScheduler.start_all_schedulers()
-    app.run(threaded=True, port=app.config.get('SERVER_PORT', None), use_reloader=False)
-
 if __name__ == "__main__":
-    run_app()
+    app.run(parse_args=True)

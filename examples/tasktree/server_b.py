@@ -17,7 +17,7 @@
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
 from frestq import decorators
-from frestq.app import app, run_app
+from frestq.app import app
 from frestq.tasks import SimpleTask, ParallelTask
 
 from common import goodbye_cruel_world
@@ -105,5 +105,7 @@ def all_goodbyes_together(task):
         ]
     )
 
+app.configure_app(config_object=__name__)
+
 if __name__ == "__main__":
-    run_app(config_object=__name__)
+    app.run(parse_args=True)

@@ -19,7 +19,7 @@
 from flask import Blueprint, make_response
 
 from frestq.tasks import SimpleTask
-from frestq.app import app, run_app
+from frestq.app import app
 
 from common import GoodbyeCruelWorldHandler
 
@@ -58,6 +58,7 @@ def post_hello(username):
     return make_response("", 200)
 
 app.register_blueprint(say_api, url_prefix='/say')
+app.configure_app(config_object=__name__)
 
 if __name__ == "__main__":
-    run_app(config_object=__name__)
+    app.run(parse_args=True)

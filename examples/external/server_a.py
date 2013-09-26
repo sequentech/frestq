@@ -19,7 +19,7 @@
 from flask import Blueprint, make_response
 
 from frestq.tasks import SimpleTask, ExternalTask
-from frestq.app import app, run_app
+from frestq.app import app
 
 # set database uri
 import os
@@ -53,6 +53,7 @@ def approve(task_id):
     return make_response("", 200)
 
 app.register_blueprint(approve_api, url_prefix='/approve')
+app.configure_app(config_object=__name__)
 
 if __name__ == "__main__":
-    run_app(config_object=__name__)
+    app.run(parse_args=True)

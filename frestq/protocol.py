@@ -17,6 +17,7 @@
 
 from __future__ import unicode_literals
 import json
+import OpenSSL
 import logging
 from threading import Condition
 from datetime import datetime, timedelta
@@ -37,7 +38,18 @@ def certs_differ(cert_a, cert_b):
     if cert_b is None:
         cert_b = u''
 
-    return cert_a != cert_b
+    if not len(cert_a) and len(cert_b) or len(cert_a) and not len(cert_b):
+        return True
+
+    # now, compare the certs for real
+    ca = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_a)
+    ca_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, ca)
+
+    cb = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_b)
+    cb_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cb)
+
+    return ca_dump != cb_dump
+
 
 class SecurityException(Exception):
     pass
@@ -56,7 +68,7 @@ def update_task(msg):
         # TODO: send back an error update
         return
 
-    # invalid update
+    # check if its an invalid or insecure update
     if certs_differ(task.receiver_ssl_cert, msg.sender_ssl_cert):
         raise  SecurityException()
 

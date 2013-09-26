@@ -16,34 +16,43 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from flask import Blueprint, make_response
-
-from frestq.tasks import SimpleTask
+from frestq import decorators
 from frestq.app import app
 
-from common import goodbye_cruel_world
+# configuration:
 
 # set database uri
 import os
 ROOT_PATH = os.path.split(os.path.abspath(__file__))[0]
-SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db.sqlite' % ROOT_PATH
+SQLALCHEMY_DATABASE_URI = 'sqlite:///%s/db2.sqlite' % ROOT_PATH
 
-say_api = Blueprint('say', __name__)
+SERVER_NAME = '127.0.0.1:5001'
 
-@say_api.route('/hello/<username>', methods=['POST'])
-def post_hello(username):
-    task = SimpleTask(
-        receiver_url='http://127.0.0.1:5001/api/queues',
-        action="testing.hello_world",
-        queue="hello_world",
-        data={
-            'username': username
-        }
+SERVER_PORT = 5001
+
+ROOT_URL = 'https://127.0.0.1:5001/api/queues'
+
+SSL_CERT_PATH = '%s/certs/selfsigned2/cert.pem' % ROOT_PATH
+
+SSL_KEY_PATH = '%s/certs/selfsigned2/key-nopass.pem' % ROOT_PATH
+
+ALLOW_ONLY_SSL_CONNECTIONS = True
+
+# action handler:
+
+@decorators.task(action="hello_world", queue="say_queue")
+def hello_world(task):
+    print "I'm sleepy!..\n"
+
+    # simulate we're working hard taking our time
+    from time import sleep
+    sleep(5)
+
+    username = task.get_data()['input_data']['username']
+    return dict(
+        output_data = "hello %s!" % username
     )
-    task.create_and_send()
-    return make_response("", 200)
 
-app.register_blueprint(say_api, url_prefix='/say')
 app.configure_app(config_object=__name__)
 
 if __name__ == "__main__":

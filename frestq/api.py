@@ -84,7 +84,15 @@ def post_message(queue_name):
             req['isinstance']):
             return error(400, "invalid/notfound %s parameter" % req['name'])
 
-    sender_ssl_cert = request.headers.get('X-Sender-SSL-Certificate', None)
+    sender_ssl_cert = request.environ.get('X-Sender-SSL-Certificate', None)
+    # NOTE: nginx adds \t to the certificate because otherwise it would be not
+    # possible to send it as a proxy header, so we have to remove those tabs.
+    # A PEM certificate does never contain tabs, so this replace is safe anyway.
+    # For more details see:
+    # - https://www.ruby-forum.com/topic/155918 and
+    # - http://nginx.org/en/docs/http/ngx_http_ssl_module.html
+    if sender_ssl_cert:
+        sender_ssl_cert = sender_ssl_cert.replace('\t', '')
 
     # check for a local message
     if data['sender_url'] == current_app.config.get('ROOT_URL'):
@@ -113,7 +121,7 @@ def post_message(queue_name):
 
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
     if not action_handler:
-        logging.error('Action handler for action %s (message id %s)' % (
+        logging.error('Action handler for action %s not found (message id %s)' % (
             msg.action, msg.id))
         return error(404, "Action handler %s not found in the queue %s" %(
             msg.action, queue_name))

@@ -20,6 +20,7 @@ import requests
 import logging
 import json
 import types
+import OpenSSL
 
 import copy
 from uuid import uuid4
@@ -91,6 +92,7 @@ class BaseTask(object):
             'action': self.task_model.action,
             'queue_name': self.task_model.queue_name,
             'sender_url': app.config.get('ROOT_URL'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
             'receiver_url': self.task_model.receiver_url,
             'input_data': self.task_model.input_data,
             'task_id': self.task_model.id
@@ -103,7 +105,7 @@ class BaseTask(object):
         db.session.add(self.task_model)
         db.session.commit()
 
-        send_message(msg_data)
+        send_message(msg_data, update_task_receiver_ssl_cert=True, task=self.task_model)
 
     def set_reservation_data(self, data):
         '''
@@ -949,7 +951,7 @@ class SynchronizedTask(BaseTask):
         self.execute_parent()
 
 
-def send_message(msg_data):
+def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     '''
     Sends a message to a peer using RESTQP protocol. Assumes the following
     required fields in msg_data:
@@ -971,10 +973,7 @@ def send_message(msg_data):
     msg_data['id'] =  str(uuid4())
     msg_data['is_received'] = False
     msg_data['sender_url'] = app.config.get('ROOT_URL')
-    msg_data['sender_ssl_cert'] = app.config.get('SSL_CERT_STRING', '')
     msg = ModelMessage(**msg_data)
-    db.session.add(msg)
-    db.session.commit()
 
     # send it to the peer
     url =  "%s/%s/" % (msg_data['receiver_url'], msg_data['queue_name'])
@@ -992,8 +991,28 @@ def send_message(msg_data):
     logging.debug('SENDING MESSAGE id %s with action %s to %s' % (
         msg.id, msg.action, url))
 
-    # TODO: use and check ssl certs here
-    r = requests.post(url, data=dumps(payload))
+    # msg is saved before sending the message so that it's registered (it might
+    # get even be retrieved from DB by api.py:post_message() if it's a local
+    # message, but it's also updated when the msg is sent to update output
+    db.session.add(msg)
+    db.session.commit()
+
+    session = requests.sessions.Session()
+
+    if app.config.get('SSL_CERT_PATH', ''):
+        # verification is done later
+        r = session.request('post', url, data=dumps(payload), verify=False,
+                          cert=(app.config.get('SSL_CERT_PATH', ''),
+                                app.config.get('SSL_KEY_PATH', '')))
+        # convert the asn1 cert retrieved from the socket into pem format
+        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, r.raw.peer_cert)
+        msg.receiver_ssl_cert = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
+        if update_task_receiver_ssl_cert and task:
+            task.receiver_ssl_cert = msg.receiver_ssl_cert
+
+    else:
+        r = session.request('post', url, data=dumps(payload))
+
 
     # TODO: check r.status_code and do some retries if it failed
     msg.output_status = r.status_code

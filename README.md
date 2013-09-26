@@ -20,12 +20,14 @@ time tou can proceed to install it manually as when you downloaded it:
 1. Download from the git repository if you haven't got a copy
 
 ```
-    $ git clone https://github.com/agoraciudadana/frestq && cd frestq/
+    $ git clone https://github.com/agoraciudadana/frestq && cd frestq
 ```
 
 2. Install package and its dependencies
 
 ```
+    $ mkvirtualenv myenv
+    $ pip install -r requirements.txt
     $ sudo python setup.py install
 ```
 

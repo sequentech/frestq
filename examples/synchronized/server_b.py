@@ -20,7 +20,7 @@ import copy
 
 from frestq import decorators
 from frestq.app import db
-from frestq.app import app, run_app
+from frestq.app import app
 from frestq.tasks import SimpleTask, ParallelTask, SynchronizedTask
 from frestq.action_handlers import SynchronizedTaskHandler
 
@@ -173,5 +173,7 @@ def all_goodbyes_together(task):
         output_data = output_data
     )
 
+app.configure_app(config_object=__name__)
+
 if __name__ == "__main__":
-    run_app(config_object=__name__)
+    app.run(parse_args=True)
