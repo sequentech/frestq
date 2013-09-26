@@ -19,7 +19,9 @@
 from __future__ import unicode_literals
 import types
 from functools import wraps
+from flask import request
 
+from .app import app
 from .action_handlers import ActionHandlers
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 
@@ -68,6 +70,21 @@ def task(action, queue, **kwargs):
         ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
         FScheduler.reserve_scheduler(queue)
 
+        return view_func
+
+    return decorator
+
+def local_task():
+    '''
+    Use to assure that the task is send from local. This is checked in a secure
+    way by checking that the sender SSL certificate is the one specified in
+    '''
+    def decorator(view_func):
+        from .protocol import certs_differ, SecurityException
+        sender_ssl_cert = request.environ.get('X-Sender-SSL-Certificate', None)
+        local_ssl_cert = app.config['SSL_CERT_STRING']
+        if certs_differ(sender_ssl_cert, local_ssl_cert):
+            raise SecurityException()
         return view_func
 
     return decorator
