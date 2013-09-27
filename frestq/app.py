@@ -45,7 +45,10 @@ class FrestqApp(Flask):
         if frestq_settings is not None:
             if not os.path.isabs(frestq_settings):
                 os.environ['FRESTQ_SETTINGS'] = os.path.abspath(frestq_settings)
+            logging.debug("FRESTQ_SETTINGS = %s" % os.environ['FRESTQ_SETTINGS'])
             self.config.from_envvar('FRESTQ_SETTINGS', silent=False)
+        else:
+            logging.warning("FRESTQ_SETTINGS not set")
 
         # store cert in
         if self.config.get('SSL_CERT_PATH', None) and\
@@ -56,6 +59,8 @@ class FrestqApp(Flask):
         else:
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
+
+        logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
         FScheduler.start_all_schedulers()
 
     def run(self, *args, **kwargs):
