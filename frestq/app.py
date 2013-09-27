@@ -18,6 +18,7 @@
 
 from __future__ import unicode_literals
 import logging
+import os
 import argparse
 from fscheduler import FScheduler
 
@@ -39,7 +40,12 @@ class FrestqApp(Flask):
         self.config.from_object(__name__)
         if config_object:
             self.config.from_object(config_object)
-        self.config.from_envvar('FRESTQ_SETTINGS', silent=True)
+
+        frestq_settings = os.environ.get('FRESTQ_SETTINGS', None)
+        if frestq_settings is not None:
+            if not os.path.isabs(frestq_settings):
+                os.environ['FRESTQ_SETTINGS'] = os.path.abspath(frestq_settings)
+            self.config.from_envvar('FRESTQ_SETTINGS', silent=False)
 
         # store cert in
         if self.config.get('SSL_CERT_PATH', None) and\
@@ -75,7 +81,7 @@ class FrestqApp(Flask):
                 return
 
             if pargs.createdb:
-                print "creating the database"
+                print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
                 db.create_all()
                 return
 

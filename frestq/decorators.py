@@ -74,7 +74,7 @@ def task(action, queue, **kwargs):
 
     return decorator
 
-def local_task():
+def local_task(*args, **kwargs):
     '''
     Use to assure that the task is send from local. This is checked in a secure
     way by checking that the sender SSL certificate is the one specified in
