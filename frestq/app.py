@@ -80,6 +80,8 @@ class FrestqApp(Flask):
                                 action="store_true")
             parser.add_argument("--tasks", help="list last tasks",
                                 action="store_true")
+            parser.add_argument("--filters", nargs='+',
+                help="filter items, with \"key=value\" ", default=[])
             parser.add_argument("--tree",
                                 help="prints the tree of related tasks")
             parser.add_argument("--show", help="prints a task in details")

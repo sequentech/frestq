@@ -69,7 +69,18 @@ def list_tasks(args):
     '''
     from .app import db
     from .models import Task
-    tasks = db.session.query(Task).order_by(Task.created_date.desc()).limit(args.limit)
+
+    filters=[]
+    for filter in args.filters:
+        key, value = filter.split("=")
+        filters.append(getattr(Task, key).__eq__(value))
+
+    if filters:
+        tasks = db.session.query(Task).filter(*filters)
+    else:
+        tasks = db.session.query(Task)
+    tasks = tasks.order_by(Task.created_date.desc()).limit(args.limit)
+
     table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'status', 'created_date'])
     for task in tasks:
         table.add_row([str(task.id)[:8], task.sender_url, task.action, task.queue_name,
@@ -82,7 +93,18 @@ def list_messages(args):
     '''
     from .app import db
     from .models import Message
-    msgs = db.session.query(Message).order_by(Message.created_date.desc()).limit(args.limit)
+
+    filters=[]
+    for filter in args.filters:
+        key, value = filter.split("=")
+        filters.append(getattr(Message, key).__eq__(value))
+
+    if filters:
+        msgs = db.session.query(Message).filter(*filters)
+    else:
+        msgs = db.session.query(Message)
+
+    msgs = msgs.order_by(Message.created_date.desc()).limit(args.limit)
     table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'created_date', 'input_data'])
     for msg in msgs:
         table.add_row([str(msg.id)[:8], msg.sender_url, msg.action, msg.queue_name,
@@ -124,6 +146,7 @@ def traverse_tasktree(task, visitor_func, visitor_kwargs):
         .with_parent(task, "subtasks")\
         .order_by(Task.order)
     for subtask in subtasks:
+
         vargs = visitor_kwargs.copy()
         vargs['level'] += 1
         traverse_tasktree(subtask, visitor_func, vargs)
