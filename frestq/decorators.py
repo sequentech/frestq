@@ -79,9 +79,9 @@ def local_task(*args, **kwargs):
     Use to assure that the task is send from local. This is checked in a secure
     way by checking that the sender SSL certificate is the one specified in
     '''
-    def decorator(view_func):
+    def decorator(view_func, task):
         from .protocol import certs_differ, SecurityException
-        sender_ssl_cert = request.environ.get('X-Sender-SSL-Certificate', None)
+        sender_ssl_cert = task.sender_ssl_cert
         local_ssl_cert = app.config['SSL_CERT_STRING']
         if certs_differ(sender_ssl_cert, local_ssl_cert):
             raise SecurityException()
