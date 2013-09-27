@@ -17,12 +17,15 @@
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import unicode_literals
+import logging
 
 from apscheduler.scheduler import Scheduler
 from apscheduler.threadpool import ThreadPool
 from apscheduler.util import convert_to_datetime
 
 INTERNAL_SCHEDULER_NAME = "internal.frestq"
+
+logging.basicConfig(level=logging.DEBUG)
 
 class NowTrigger(object):
     def __init__(self):
@@ -82,12 +85,12 @@ class FScheduler(Scheduler):
         queues_opts = app.config.get('QUEUES_OPTIONS', dict())
 
         for queue_name, sched in FScheduler._schedulers.iteritems():
-            print "starting %s scheduler" % queue_name
+            logging.info("starting %s scheduler" % queue_name)
 
             opts = queues_opts.get(queue_name, dict())
             if 'max_threads' in opts:
-                print "setting scheduler for queue %s with "\
-                    "max_threads = %d " %(queue_name, opts['max_threads'])
+                logging.info("setting scheduler for queue %s with "\
+                    "max_threads = %d " %(queue_name, opts['max_threads']))
                 sched._threadpool.max_threads = opts['max_threads']
 
             sched.start()
@@ -107,7 +110,7 @@ class FScheduler(Scheduler):
         :rtype: :class:`~apscheduler.job.Job`
         """
 
-        print "adding job in sched for queue %s" % self.queue_name
+        logging.info("adding job in sched for queue %s" % self.queue_name)
         trigger = NowTrigger()
         options['max_runs'] = 1
         if 'misfire_grace_time' not in options:
