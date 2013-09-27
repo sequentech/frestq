@@ -1004,11 +1004,15 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
         r = session.request('post', url, data=dumps(payload), verify=False,
                           cert=(app.config.get('SSL_CERT_PATH', ''),
                                 app.config.get('SSL_KEY_PATH', '')))
+
         # convert the asn1 cert retrieved from the socket into pem format
-        cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, r.raw.peer_cert)
-        msg.receiver_ssl_cert = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
-        if update_task_receiver_ssl_cert and task:
-            task.receiver_ssl_cert = msg.receiver_ssl_cert
+        try:
+            cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, r.raw.peer_cert)
+            msg.receiver_ssl_cert = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
+            if update_task_receiver_ssl_cert and task:
+                task.receiver_ssl_cert = msg.receiver_ssl_cert
+        except Exception, e:
+            pass
 
     else:
         r = session.request('post', url, data=dumps(payload))
