@@ -74,9 +74,18 @@ class FrestqApp(Flask):
             del kwargs['parse_args']
 
             parser = argparse.ArgumentParser()
-            parser.add_argument("--createdb", help="create the database", action="store_true")
-            parser.add_argument("--messages", help="list last messages", action="store_true")
-            parser.add_argument("--tasks", help="list last tasks", action="store_true")
+            parser.add_argument("--createdb", help="create the database",
+                                action="store_true")
+            parser.add_argument("--messages", help="list last messages",
+                                action="store_true")
+            parser.add_argument("--tasks", help="list last tasks",
+                                action="store_true")
+            parser.add_argument("--tree",
+                                help="prints the tree of related tasks")
+            parser.add_argument("--show", help="prints a task in details")
+            parser.add_argument("--with-parents",
+                                help="show in the tree parent tasks too",
+                                action="store_true")
             parser.add_argument("-n", "--limit", help="limit number of results",
                                 type=int, default=20)
             pargs = parser.parse_args()
@@ -89,13 +98,17 @@ class FrestqApp(Flask):
                 print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
                 db.create_all()
                 return
-
-            if pargs.messages:
+            elif pargs.messages:
                 list_messages(pargs)
                 return
-
-            if pargs.tasks:
+            elif pargs.tasks:
                 list_tasks(pargs)
+                return
+            elif pargs.tree:
+                task_tree(pargs)
+                return
+            elif pargs.show:
+                show_task(pargs)
                 return
 
         # ignore these threaded or use_reloader, we force those two
@@ -159,7 +172,7 @@ from .api import api
 app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
-from .utils import list_messages, list_tasks
+from .utils import list_messages, list_tasks, task_tree, show_task
 
 if __name__ == "__main__":
     app.run(parse_args=True)

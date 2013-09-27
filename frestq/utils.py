@@ -51,19 +51,22 @@ def datetime_decoder(d):
     elif isinstance(d, dict):
         return dict(result)
 
-def dumps(obj):
+def dumps(obj, **kwargs):
     '''
     dumps that also decodes datetimes
     '''
-    return json.dumps(obj, cls=JSONDateTimeEncoder)
+    return json.dumps(obj, cls=JSONDateTimeEncoder, **kwargs)
 
-def loads(obj):
+def loads(obj, **kwargs):
     '''
     loads that also encodes datetimes
     '''
-    return json.loads(obj, object_hook=datetime_decoder)
+    return json.loads(obj, object_hook=datetime_decoder, **kwargs)
 
 def list_tasks(args):
+    '''
+    Prints the list of tasks
+    '''
     from .app import db
     from .models import Task
     tasks = db.session.query(Task).order_by(Task.created_date.desc()).limit(args.limit)
@@ -74,6 +77,9 @@ def list_tasks(args):
     print table
 
 def list_messages(args):
+    '''
+    Prints the list of messages
+    '''
     from .app import db
     from .models import Message
     msgs = db.session.query(Message).order_by(Message.created_date.desc()).limit(args.limit)
@@ -82,6 +88,80 @@ def list_messages(args):
         table.add_row([str(msg.id)[:8], msg.sender_url, msg.action, msg.queue_name,
                        msg.created_date, str(msg.input_data)[:30]])
     print table
+
+def print_task(task, base_task_id=None, level=0, mode="full"):
+    '''
+    Prints a task. Available modes are: full and oneline. level is used only
+    in oneline mode.
+    '''
+    if mode == 'oneline':
+        if level == 0:
+            indent = " *"
+        elif level == 1:
+            indent = "   |-"
+        elif level > 1:
+            indent = "   " + "|  " * (level - 1) + "|-"
+
+        extra = [str(task.id)[:8], task.status]
+        if extra[0] == base_task_id:
+            extra.append('root')
+
+        print "%(indent)s %(action)s.%(queue)s (%(extra)s)" % dict(
+            indent=indent,
+            action=task.action,
+            queue=task.queue_name,
+            extra=", ".join(extra))
+    else:
+        print dumps(task.to_dict(), indent=4)
+
+def traverse_tasktree(task, visitor_func, visitor_kwargs):
+    visitor_func(task, **visitor_kwargs)
+
+    from .app import db
+    from .models import Task
+
+    subtasks = db.session.query(Task)\
+        .with_parent(task, "subtasks")\
+        .order_by(Task.order)
+    for subtask in subtasks:
+        vargs = visitor_kwargs.copy()
+        vargs['level'] += 1
+        traverse_tasktree(subtask, visitor_func, vargs)
+
+def show_task(args):
+    from .app import db
+    from .models import Task
+    task_id = unicode(args.show)
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    if not task_model:
+        print "task %s not found" % task_id
+        return
+    task_model = task_model[0]
+    print_task(task_model)
+
+def task_tree(args):
+    from .app import db
+    from .models import Task
+    task_id = unicode(args.tree)
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    if not task_model:
+        print "task %s not found" % task_id
+        return
+    task_model = task_model[0]
+    if args.with_parents:
+        while task_model.parent_id:
+            try:
+                task_model = db.session.query(Task).get(task_model.parent_id)
+            except:
+                print "task %s, which is the parent of %s not found" % (
+                    str(task.parent_id)[:8],
+                    str(task.id)[:8],
+                )
+                break
+
+    level = 0
+    traverse_tasktree(task=task_model, visitor_func=print_task,
+        visitor_kwargs=dict(base_task_id=task_id, level=0, mode="oneline"))
 
 class DecoratorBase(object):
     func = None
