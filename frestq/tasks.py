@@ -333,7 +333,8 @@ class SimpleTask(BaseTask):
     auto_finish_after_handler = True
 
     def __init__(self, receiver_url, action, queue, data=None, label=None,
-            info_text=None, pingback_date=None, expiration_date=None):
+            info_text=None, pingback_date=None, expiration_date=None,
+            receiver_ssl_cert=None):
         '''
         Constructor of a simple tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -350,6 +351,7 @@ class SimpleTask(BaseTask):
         self.info_text = info_text
         self.expiration_date = expiration_date
         self.pingback_date = pingback_date
+        self.receiver_ssl_cert = receiver_ssl_cert
 
     @classmethod
     def _create_from_model(cls, task_model):
@@ -385,7 +387,8 @@ class SimpleTask(BaseTask):
             'receiver_url': self.receiver_url,
             'is_received': False,
             'is_local': app.config.get('ROOT_URL') == self.receiver_url,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
+            'receiver_ssl_cert': self.receiver_ssl_cert,
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
@@ -474,7 +477,7 @@ class ExternalTask(SimpleTask):
             'receiver_url': self.receiver_url,
             'is_received': False,
             'is_local': app.config.get('ROOT_URL') == self.receiver_url,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
@@ -578,7 +581,7 @@ class SequentialTask(BaseTask):
             'receiver_url': app.config.get('ROOT_URL'),
             'is_received': False,
             'is_local': True,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
@@ -701,7 +704,7 @@ class ParallelTask(BaseTask):
             'receiver_url': app.config.get('ROOT_URL'),
             'is_received': False,
             'is_local': True,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
@@ -874,7 +877,7 @@ class SynchronizedTask(BaseTask):
             'receiver_url': app.config.get('ROOT_URL'),
             'is_received': False,
             'is_local': True,
-            'sender_ssl_cert': app.config.get('SSL_CERT_STRING'),
+            'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
@@ -973,6 +976,7 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     msg_data['id'] =  str(uuid4())
     msg_data['is_received'] = False
     msg_data['sender_url'] = app.config.get('ROOT_URL')
+    msg_data['sender_ssl_cert'] = app.config.get('SSL_CERT_STRING', '')
     msg = ModelMessage(**msg_data)
 
     # send it to the peer

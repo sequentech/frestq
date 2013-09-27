@@ -269,6 +269,7 @@ def synchronize_task(msg):
             'is_received': msg.is_received,
             'is_local': is_local,
             'sender_ssl_cert': msg.sender_ssl_cert,
+            'receiver_ssl_cert': app.config.get('SSL_CERT_STRING'),
             'input_data': msg.input_data['input_data'],
             'pingback_date': msg.input_data['pingback_date'],
             'expiration_date': msg.input_data['expiration_date'],
@@ -281,6 +282,10 @@ def synchronize_task(msg):
         db.session.commit()
     else:
         if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
+            print task.receiver_ssl_cert
+            print msg.sender_ssl_cert
+            print "task.id = %s" % task.id
+            print "msg.id = %s" % msg.id
             raise  SecurityException()
         if is_local and task.task_type == 'simple':
             # this could happen if the task was created with SimpleTask
@@ -320,8 +325,11 @@ def director_confirm_task_reservation(msg):
         # unhandled state
         return
 
-    # invalid update
     if certs_differ(task.receiver_ssl_cert, msg.sender_ssl_cert):
+        print task.receiver_ssl_cert
+        print msg.sender_ssl_cert
+        print "task.id = %s" % task.id
+        print "msg.id = %s" % msg.id
         raise  SecurityException()
 
     task.status = 'reserved'
@@ -352,7 +360,8 @@ def director_confirm_task_reservation(msg):
     if not_reserved_children_num != 0:
         return
 
-    parent_instance.action_handler_object.pre_execute()
+    if parent_instance.action_handler_object:
+        parent_instance.action_handler_object.pre_execute()
 
     # start all children in parallel
     for child in parent_instance.get_children():
@@ -368,7 +377,8 @@ def director_cancel_reserved_subtask(task_id):
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     task_instance = BaseTask.instance_by_model(task)
-    task_instance.get_parent().action_handler_object.cancelled_reservation(task_instance)
+    if task_instance.get_parent().action_handler_object:
+        task_instance.get_parent().action_handler_object.cancelled_reservation(task_instance)
 
     if task.status != 'reserved':
         return
