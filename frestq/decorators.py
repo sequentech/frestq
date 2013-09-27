@@ -24,6 +24,7 @@ from flask import request
 from .app import app
 from .action_handlers import ActionHandlers
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
+from .utils import DecoratorBase
 
 def message_action(action, queue, **kwargs):
     """
@@ -74,20 +75,19 @@ def task(action, queue, **kwargs):
 
     return decorator
 
-def local_task(*args, **kwargs):
+class local_task(DecoratorBase):
     '''
     Use to assure that the task is send from local. This is checked in a secure
     way by checking that the sender SSL certificate is the one specified in
     '''
-    def decorator(view_func, task):
+    def __call__(self, *args):
         from .protocol import certs_differ, SecurityException
-        sender_ssl_cert = task.sender_ssl_cert
+        task = args[0]
+        sender_ssl_cert = task.task_model.sender_ssl_cert
         local_ssl_cert = app.config['SSL_CERT_STRING']
         if certs_differ(sender_ssl_cert, local_ssl_cert):
             raise SecurityException()
-        return view_func
-
-    return decorator
+        return self.func(*args)
 
 def internal_task(name, **kwargs):
     """

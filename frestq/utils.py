@@ -82,3 +82,21 @@ def list_messages(args):
         table.add_row([str(msg.id)[:8], msg.sender_url, msg.action, msg.queue_name,
                        msg.created_date, str(msg.input_data)[:30]])
     print table
+
+class DecoratorBase(object):
+    func = None
+
+    def __init__(self, func):
+        self.func = func
+
+    def __getattribute__(self, name):
+        if name == "func":
+            return super(DecoratorBase, self).__getattribute__(name)
+
+        return self.func.__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        if name == "func":
+            return super(DecoratorBase, self).__setattr__(name, value)
+
+        return self.func.__setattr__(name, value)
