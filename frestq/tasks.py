@@ -433,7 +433,7 @@ class ExternalTask(SimpleTask):
     '''
 
     def __init__(self, receiver_url, data=None, label=None,
-            info_text=None, pingback_date=None, expiration_date=None):
+            pingback_date=None, expiration_date=None):
         '''
         Constructor of a external tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -442,7 +442,7 @@ class ExternalTask(SimpleTask):
         to create(), and to send it to the receiver, call to send().
         '''
         super(ExternalTask, self).__init__(receiver_url=receiver_url,
-            data=data, label=label, info_text=info_text,
+            data=data, label=label,
             pingback_date=pingback_date, expiration_date=expiration_date,
             queue=INTERNAL_SCHEDULER_NAME, action="frestq.virtual_empty_task")
 
@@ -481,7 +481,6 @@ class ExternalTask(SimpleTask):
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
-            'info_text': self.info_text,
             'id': task_id,
             'status': 'created',
             'task_type': 'external',
@@ -585,7 +584,6 @@ class SequentialTask(BaseTask):
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
-            'info_text': None,
             'id': task_id,
             'status': 'created',
             'task_type': 'sequential',

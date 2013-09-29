@@ -84,7 +84,10 @@ class FrestqApp(Flask):
                 help="filter items, with \"key=value\" ", default=[])
             parser.add_argument("--tree",
                                 help="prints the tree of related tasks")
-            parser.add_argument("--show", help="prints a task in details")
+            parser.add_argument("--show", help="prints a task in detail")
+            parser.add_argument("--show-external", help="prints an external task details")
+            parser.add_argument("--finish", help="finish an external task",
+                                nargs=2, default=None)
             parser.add_argument("--with-parents",
                                 help="show in the tree parent tasks too",
                                 action="store_true")
@@ -111,6 +114,12 @@ class FrestqApp(Flask):
                 return
             elif pargs.show:
                 show_task(pargs)
+                return
+            elif pargs.show_external:
+                show_external_task(pargs)
+                return
+            elif pargs.finish:
+                finish_task(pargs)
                 return
 
         # ignore these threaded or use_reloader, we force those two
@@ -174,7 +183,8 @@ from .api import api
 app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
-from .utils import list_messages, list_tasks, task_tree, show_task
+from .utils import (list_messages, list_tasks, task_tree, show_task,
+                    show_external_task, finish_task)
 
 if __name__ == "__main__":
     app.run(parse_args=True)

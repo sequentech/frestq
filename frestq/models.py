@@ -243,7 +243,8 @@ class Task(db.Model):
 
     id = db.Column(db.Unicode(128), primary_key=True)
 
-    # this can be "simple", "sequential", "parallel" or "synchronized"
+    # this can be "simple", "sequential", "parallel", "external" or
+    # "synchronized"
     task_type = db.Column(db.Unicode(1024))
 
     # for example used in synchronous tasks to store the algorithm

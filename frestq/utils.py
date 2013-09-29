@@ -81,10 +81,13 @@ def list_tasks(args):
         tasks = db.session.query(Task)
     tasks = tasks.order_by(Task.created_date.desc()).limit(args.limit)
 
-    table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'status', 'created_date'])
+    table = PrettyTable(['small id', 'sender_url', 'action', 'queue',
+                         'task_type', 'status', 'created_date'])
+
     for task in tasks:
-        table.add_row([str(task.id)[:8], task.sender_url, task.action, task.queue_name,
-                       task.status, task.created_date])
+        table.add_row([str(task.id)[:8], task.sender_url, task.action,
+                       task.queue_name, task.task_type, task.status,
+                       task.created_date])
     print table
 
 def list_messages(args):
@@ -128,10 +131,11 @@ def print_task(task, base_task_id=None, level=0, mode="full"):
         if extra[0] == base_task_id:
             extra.append('root')
 
-        print "%(indent)s %(action)s.%(queue)s (%(extra)s)" % dict(
+        print "%(indent)s %(action)s.%(queue)s - %(task_type)s (%(extra)s)" % dict(
             indent=indent,
             action=task.action,
             queue=task.queue_name,
+            task_type=task.task_type,
             extra=", ".join(extra))
     else:
         print dumps(task.to_dict(), indent=4)
@@ -161,6 +165,57 @@ def show_task(args):
         return
     task_model = task_model[0]
     print_task(task_model)
+
+def show_external_task(args):
+    from .app import db
+    from .models import Task
+
+    task_id = unicode(args.show_external)
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+
+    if not task_model:
+        print "task %s not found" % task_id
+        return
+    task_model = task_model[0]
+
+    if task_model.task_type != "external":
+        print "task %s is not external" % task_id
+        return
+
+    print_task(task_model, mode="oneline")
+    print "label: %s" % task_model.label
+    print "info_text: %s" % task_model.input_data
+
+def finish_task(args):
+    from .app import db
+    from .models import Task
+    from .tasks import ExternalTask
+
+    task_id = unicode(args.finish[0])
+    try:
+        finish_data = loads(unicode(args.finish[1]))
+    except:
+        print "error loading the json finish data"
+        return
+
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+
+    if not task_model:
+        print "task %s not found" % task_id
+        return
+    task_model = task_model[0]
+
+    if task_model.task_type != "external":
+        print "task %s is not external" % task_id
+        return
+
+    task = ExternalTask.instance_by_id(task_model.id)
+    task.finish(data=finish_data)
+
+
+def deny_task(args):
+    # TODO not implemented
+    pass
 
 def task_tree(args):
     from .app import db

@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from frestq import decorators
 from frestq.app import app
+from frestq import decorators
 from frestq.tasks import ExternalTask
 
 from flask import Blueprint, make_response
