@@ -40,10 +40,7 @@ ROOT_URL = 'http://127.0.0.1:5001/api/queues'
 @decorators.task(action="hello_world", queue="say_queue")
 def hello_world(task):
 
-    approve_task = ExternalTask(
-        data=dict(type="approve"),
-        receiver_url='http://127.0.0.1:5001/api/queues'
-    )
+    approve_task = ExternalTask(data=dict(type="approve"))
     task.add(approve_task)
 
     return dict(

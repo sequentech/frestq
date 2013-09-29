@@ -125,11 +125,20 @@ class BaseTask(object):
         '''
         return copy.deepcopy(self.task_model.to_dict())
 
-    def set_output_data(self, data):
+    def set_output_data(self, data, send_update_to_sender=False):
         '''
-        Setter of a task's output data
+        Setter of a task's output data.
         '''
         self.task_model.output_data = data
+        if send_update_to_sender:
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # if task is local, there's no update neeeded
+            if self.task_model.is_local:
+                return
+            sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
+            sched.add_now_job(send_task_update, [self.task_model.id])
 
     @staticmethod
     def instance_by_id(task_id):
@@ -432,8 +441,7 @@ class ExternalTask(SimpleTask):
     manually change the state to "finished" with finish()
     '''
 
-    def __init__(self, receiver_url, data=None, label=None,
-            pingback_date=None, expiration_date=None):
+    def __init__(self, data=None, label=None, expiration_date=None):
         '''
         Constructor of a external tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -441,17 +449,20 @@ class ExternalTask(SimpleTask):
         Note: to save the task in the database of the sender you need to call
         to create(), and to send it to the receiver, call to send().
         '''
-        super(ExternalTask, self).__init__(receiver_url=receiver_url,
-            data=data, label=label,
-            pingback_date=pingback_date, expiration_date=expiration_date,
-            queue=INTERNAL_SCHEDULER_NAME, action="frestq.virtual_empty_task")
+        super(ExternalTask, self).__init__(
+            receiver_url=app.config.get('ROOT_URL'),
+            receiver_ssl_cert=app.config.get('SSL_CERT_STRING', ''),
+            data=data,
+            label=label,
+            pingback_date=None,
+            expiration_date=expiration_date,
+            queue=INTERNAL_SCHEDULER_NAME,
+            action="frestq.virtual_empty_task")
 
     @classmethod
     def _create_from_model(cls, task_model):
         ret = cls(
-            receiver_url=task_model.receiver_url,
             data=task_model.input_data,
-            pingback_date=task_model.pingback_date,
             expiration_date=task_model.expiration_date,
             label=task_model.label
        )
@@ -478,6 +489,7 @@ class ExternalTask(SimpleTask):
             'is_received': False,
             'is_local': app.config.get('ROOT_URL') == self.receiver_url,
             'sender_ssl_cert': app.config.get('SSL_CERT_STRING', ''),
+            'receiver_ssl_cert': self.receiver_ssl_cert,
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
@@ -506,6 +518,16 @@ class ExternalTask(SimpleTask):
         }
         send_message(msg_data)
 
+    def execute(self):
+        '''
+        Marks the task as executing, but waits for user
+        '''
+        if self.task_model.status in ['created', 'sent']:
+            self.task_model.status = "executing"
+            db.session.add(self.task_model)
+            db.session.commit()
+        elif self.task_model.status == "finished":
+            self.execute_parent()
 
 class SequentialTask(BaseTask):
     '''
@@ -614,6 +636,11 @@ class SequentialTask(BaseTask):
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
         '''
+        if self.task_model.status in ['created', 'sent']:
+            self.task_model.status = "executing"
+            db.session.add(self.task_model)
+            db.session.commit()
+
         next_subtask_model = self.next_subtask()
 
         # check if there's no subtask left to do, and send the do next signal
@@ -748,7 +775,7 @@ class ParallelTask(BaseTask):
         # if this is the first time do next is called and there are subtasks,
         # let's mark this task as executing and start all the subtasks in
         # parallel
-        if self.task_model.status == 'created' and num_unfinished_subtasks > 0:
+        if self.task_model.status in ['created', 'sent'] and num_unfinished_subtasks > 0:
             # mark as executing this task
             self.task_model.status = "executing"
             db.session.add(self.task_model)
@@ -919,7 +946,7 @@ class SynchronizedTask(BaseTask):
 
         # if this is the first time do next is called and there are subtasks,
         # let's mark this task as executing and start doing the synchronization
-        if self.task_model.status == 'created':
+        if self.task_model.status in ['created', 'sent']:
             self._synchronize()
 
         # check if there's no subtask left to do, and send the do next signal

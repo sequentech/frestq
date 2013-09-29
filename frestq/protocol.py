@@ -290,10 +290,6 @@ def synchronize_task(msg):
         db.session.commit()
     else:
         if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
-            print task.receiver_ssl_cert
-            print msg.sender_ssl_cert
-            print "task.id = %s" % task.id
-            print "msg.id = %s" % msg.id
             raise  SecurityException()
         if is_local and task.task_type == 'simple':
             # this could happen if the task was created with SimpleTask
@@ -334,10 +330,6 @@ def director_confirm_task_reservation(msg):
         return
 
     if certs_differ(task.receiver_ssl_cert, msg.sender_ssl_cert):
-        print task.receiver_ssl_cert
-        print msg.sender_ssl_cert
-        print "task.id = %s" % task.id
-        print "msg.id = %s" % msg.id
         raise  SecurityException()
 
     task.status = 'reserved'
@@ -481,7 +473,7 @@ def finish_external_task(msg):
     # get the task model
     task_model = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     if not task_model or task_model.task_type != "external" or\
-        task_model.status != 'sent' or\
+        task_model.status != 'executing' or\
         task_model.sender_url != app.config.get('ROOT_URL'):
         # TODO error management stuff
         return
