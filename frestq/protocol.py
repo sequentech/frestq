@@ -33,10 +33,18 @@ def certs_differ(cert_a, cert_b):
     '''
     Compare certificates
     '''
+    from .app import app
     if cert_a is None:
         cert_a = u''
     if cert_b is None:
         cert_b = u''
+
+    if app.config.get('ALLOW_ONLY_SSL_CONNECTIONS') and\
+            (not len(cert_a) or not len(cert_b)):
+        raise SecurityException()
+
+    if not len(cert_a) and not len(cert_b):
+        return False
 
     if not len(cert_a) and len(cert_b) or len(cert_a) and not len(cert_b):
         return True
