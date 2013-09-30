@@ -78,11 +78,27 @@ def task(action, queue, **kwargs):
 class local_task(DecoratorBase):
     '''
     Use to assure that the task is send from local. This is checked in a secure
-    way by checking that the sender SSL certificate is the one specified in
+    way by checking that the sender SSL certificate is the one specified.
+
+    NOTE: if you use this decorator in an TaskHandler, put it before the task
+    decorator or it won't work. Do it as shown in the following code example:
+
+    from frestq import decorators
+    from frestq.action_handlers import TaskHandler
+
+    @decorators.local_task
+    @decorators.task(...)
+    class FooTask(TaskHandler):
+       pass
     '''
     def __call__(self, *args):
         from .protocol import certs_differ, SecurityException
-        task = args[0]
+
+        if  type(self.func) is types.ClassType:
+            task = self.func.task
+        else:
+            task = args[0]
+
         sender_ssl_cert = task.task_model.sender_ssl_cert
         local_ssl_cert = app.config['SSL_CERT_STRING']
         if certs_differ(sender_ssl_cert, local_ssl_cert):
