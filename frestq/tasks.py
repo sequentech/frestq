@@ -674,7 +674,10 @@ class SequentialTask(BaseTask):
             self.error = TaskError(dict(subtask_failed=next_subtask_model))
             self.propagate = True
             if self.action_handler_object:
-                self.action_handler_object.error(self.error)
+                try:
+                    self.action_handler_object.handle_error(self.error)
+                except:
+                    self.propagate = True
 
             if self.propagate:
                 self.task_model.status = "finished" if not self.propagate else "error"
@@ -820,7 +823,7 @@ class ParallelTask(BaseTask):
         # action handler that can stop it
         errored_tasks = self.errored_tasks()
         if errored_tasks.count() > 0:
-            self.error = TaskError(dict(subtask_failed=errored_tasks))
+            self.error = SubTasksFailed(errored_tasks)
             self.task_model.status = "error"
             db.session.add(self.task_model)
             db.session.commit()
@@ -1016,7 +1019,7 @@ class SynchronizedTask(BaseTask):
         # action handler that can stop it
         errored_tasks = self.errored_tasks()
         if errored_tasks.count() > 0:
-            self.error = TaskError(dict(subtask_failed=errored_tasks))
+            self.error = SubTasksFailed(errored_tasks)
             self.task_model.status = "error"
             db.session.add(self.task_model)
             db.session.commit()
@@ -1147,6 +1150,11 @@ class TaskError(Exception):
         self.data = data
 
 
+class SubTasksFailed(TaskError):
+    def __init__(self, subtasks):
+        self.subtasks = subtasks
+
+
 def send_task_update(task_id):
     '''
     Sends to the task creator (which is not us) an update with the task
@@ -1258,7 +1266,11 @@ def post_task(msg, action_handler):
         task.error = e
         task.propagate = True
         if task.action_handler_object:
-            task.action_handler_object.error(e)
+            try:
+                task.action_handler_object.handle_error(e)
+            except:
+                task.propagate = True
+            print "after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate)
 
     # 3. update asynchronously the task sender if requested
     if task.auto_finish_after_handler or task.propagate:
