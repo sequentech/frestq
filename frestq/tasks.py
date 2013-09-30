@@ -62,6 +62,10 @@ class BaseTask(object):
     # the action handler for this task, if action_handler is a class
     action_handler_object = None
 
+    error = None
+
+    propagate = False
+
 
     def __init__(self):
         super(BaseTask, self).__init__()
@@ -430,6 +434,8 @@ class SimpleTask(BaseTask):
             simple_task.send()
         elif self.task_model.status == "finished":
             self.execute_parent()
+        elif self.task_model.status == "error":
+            self.execute_parent()
 
 
 class ExternalTask(SimpleTask):
@@ -468,7 +474,7 @@ class ExternalTask(SimpleTask):
        )
         ret.task_model = task_model
         # local task do not need updates
-        ret.send_update_to_sender = not task_model.is_local
+        ret.send_update_to_sender = False
         ret._init_from_model()
         return ret
 
@@ -641,6 +647,9 @@ class SequentialTask(BaseTask):
             db.session.add(self.task_model)
             db.session.commit()
 
+        if self.task_model.status in ['finished', 'error']:
+            return
+
         next_subtask_model = self.next_subtask()
 
         # check if there's no subtask left to do, and send the do next signal
@@ -661,7 +670,31 @@ class SequentialTask(BaseTask):
             self.execute_parent()
             return
 
-        if next_subtask_model.status in ['sent', 'executing', 'error']:
+        if next_subtask_model.status == 'error':
+            self.error = TaskError(dict(subtask_failed=next_subtask_model))
+            self.propagate = True
+            if self.action_handler_object:
+                self.action_handler_object.error(self.error)
+
+            if self.propagate:
+                self.task_model.status = "finished" if not self.propagate else "error"
+                db.session.add(self.task_model)
+                db.session.commit()
+
+            if not self.task_model.is_local:
+                sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
+                sched.add_now_job(send_task_update, [self.task_model.id])
+
+            # execute the task synchronously
+            #
+            # for simple task this function does nothing. For sequential tasks this spawns
+            # the next subtask (or update sender status to finished), and for parallel
+            # tasks it launches all subtasks
+            self.execute_parent()
+            return
+
+
+        if next_subtask_model.status in ['sent', 'executing']:
             return
 
         # execute next subtask
@@ -765,12 +798,36 @@ class ParallelTask(BaseTask):
         return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
+    def errored_tasks(self):
+        '''
+        Count the number of subtasks with error
+        '''
+        return db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").filter(ModelTask.status == 'error')
+
     def execute(self):
         '''
         After executing the task handler, this funcion is called once per each
         subtask, and executes each subtask sequentally and in order
         '''
+        # if task is already errored, this has already been dealt with
+        if self.task_model.status == 'error':
+            return
+
         num_unfinished_subtasks = self.count_unfinished_subtasks()
+
+        # if we find an error, propagate, as this kind of task do not have an
+        # action handler that can stop it
+        errored_tasks = self.errored_tasks()
+        if errored_tasks.count() > 0:
+            self.error = TaskError(dict(subtask_failed=errored_tasks))
+            self.task_model.status = "error"
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # propagate
+            self.execute_parent()
+            return
 
         # if this is the first time do next is called and there are subtasks,
         # let's mark this task as executing and start all the subtasks in
@@ -938,11 +995,35 @@ class SynchronizedTask(BaseTask):
         return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
+    def errored_tasks(self):
+        '''
+        Count the number of subtasks with error
+        '''
+        return db.session.query(ModelTask).with_parent(self.task_model,
+            "subtasks").filter(ModelTask.status == 'error')
+
     def execute(self):
         '''
         After executing the task handler, this function is
         '''
+        # if task is already errored, this has already been dealt with
+        if self.task_model.status == 'error':
+            return
+
         num_unfinished_subtasks = self.count_unfinished_subtasks()
+
+        # if we find an error, propagate, as this kind of task do not have an
+        # action handler that can stop it
+        errored_tasks = self.errored_tasks()
+        if errored_tasks.count() > 0:
+            self.error = TaskError(dict(subtask_failed=errored_tasks))
+            self.task_model.status = "error"
+            db.session.add(self.task_model)
+            db.session.commit()
+
+            # propagate
+            self.execute_parent()
+            return
 
         # if this is the first time do next is called and there are subtasks,
         # let's mark this task as executing and start doing the synchronization
@@ -1054,6 +1135,18 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     db.session.commit()
 
 
+class TaskError(Exception):
+    '''
+    Exception that can be thrown during the execution of a task to indicate
+    something went wrong.
+
+    This kind of exception propagates to parent task recursively. This can only
+    be stopped by the error handler of a task, if any.
+    '''
+    def __init__(self, data):
+        self.data = data
+
+
 def send_task_update(task_id):
     '''
     Sends to the task creator (which is not us) an update with the task
@@ -1156,13 +1249,20 @@ def post_task(msg, action_handler):
 
     # 2. call to the handler
     task = BaseTask.instance_by_model(task_model)
-    task_output = task.run_action_handler()
-    if task_output:
-        update_task(task, task_output)
+    try:
+        task_output = task.run_action_handler()
+        if task_output:
+            update_task(task, task_output)
+    except Exception, e:
+        import traceback; traceback.print_exc()
+        task.error = e
+        task.propagate = True
+        if task.action_handler_object:
+            task.action_handler_object.error(e)
 
     # 3. update asynchronously the task sender if requested
-    if task.auto_finish_after_handler:
-        task_model.status = "finished"
+    if task.auto_finish_after_handler or task.propagate:
+        task_model.status = "finished" if not task.propagate else "error"
         db.session.add(task_model)
         db.session.commit()
 
@@ -1175,4 +1275,7 @@ def post_task(msg, action_handler):
     # for simple task this function does nothing. For sequential tasks this spawns
     # the next subtask (or update sender status to finished), and for parallel
     # tasks it launches all subtasks
-    task.execute()
+    if task.propagate:
+        task.execute_parent()
+    else:
+        task.execute()

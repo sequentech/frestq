@@ -62,8 +62,8 @@ class ActionHandlers(object):
 
 class TaskHandler(object):
     '''
-    This is a class-based task handler. Substitute the function-based
-    task handlers
+    This is a class-based task handler. Substitutes the function-based
+    task handlers.
     '''
     # task member variable will contain a pointer to the task model when
     # TaskHandler.execute is called.
@@ -78,6 +78,16 @@ class TaskHandler(object):
         Executes the task handler.
 
         Reimplementing this function is optional but highly recommendable.
+        '''
+        pass
+
+    def handle_error(self, error):
+        '''
+        Handles an error occured during the execution of this task of a subtask.
+
+        By default does nothing and then the error is propagated to the parent
+        task. If you reimplement this function, you can stop propagation by
+        setting self.task.propagate = False.
         '''
         pass
 

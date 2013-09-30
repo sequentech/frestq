@@ -184,7 +184,7 @@ def show_external_task(args):
 
     print_task(task_model, mode="oneline")
     print "label: %s" % task_model.label
-    print "info_text: %s" % task_model.input_data
+    print "info_text:\n%s" % task_model.input_data
 
 def finish_task(args):
     from .app import db

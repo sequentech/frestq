@@ -166,18 +166,31 @@ def reserve_task(task_id):
                 db.session.commit()
 
                 task = BaseTask.instance_by_model(task_model)
-                task_output = task.run_action_handler()
+                try:
+                    task_output = task.run_action_handler()
+                except Exception, e:
+                    task.error = e
+                    task.propagate = True
+                    if task.action_handler_object:
+                        task.action_handler_object.error(e)
+
                 if task_output:
                     update_task(task, task_output)
 
                 # 7. update asynchronously the task sender if requested
-                if task.auto_finish_after_handler:
+                if task.propagate:
+                    import traceback; traceback.print_last()
+                    task_model.status = "error"
+                    task_model.last_modified_date = datetime.utcnow()
+                    db.session.add(task_model)
+                    db.session.commit()
+                elif task.auto_finish_after_handler:
                     task_model.status = "finished"
                     task_model.last_modified_date = datetime.utcnow()
                     db.session.add(task_model)
                     db.session.commit()
 
-                if task.send_update_to_sender:
+                if task.send_update_to_sender or task.propagate:
                     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
                     sched.add_now_job(send_task_update, [task_model.id])
 

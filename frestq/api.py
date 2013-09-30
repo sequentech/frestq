@@ -42,7 +42,7 @@ def call_action_handler(msg_id, queue_name):
     Calls asynchronously to the action handler
     '''
     from .models import Message
-    from .tasks import post_task
+    from .tasks import post_task, TaskError
     logging.debug('EXEC ACTION handler for MESSAGE id %s (QUEUE %s)' % (
         msg_id, queue_name))
     msg = Message.query.get(msg_id)
