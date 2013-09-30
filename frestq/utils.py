@@ -158,13 +158,24 @@ def traverse_tasktree(task, visitor_func, visitor_kwargs):
 def show_task(args):
     from .app import db
     from .models import Task
-    task_id = unicode(args.show)
+    task_id = unicode(args.show_task)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
         print "task %s not found" % task_id
         return
     task_model = task_model[0]
     print_task(task_model)
+
+def show_message(args):
+    from .app import db
+    from .models import Message
+    msg_id = unicode(args.show_message)
+    msg_model = db.session.query(Message).filter(Message.id.startswith(msg_id)).all()
+    if not msg_model:
+        print "message %s not found" % msg_id
+        return
+    msg_model = msg_model[0]
+    print dumps(msg_model.to_dict(), indent=4)
 
 def show_external_task(args):
     from .app import db

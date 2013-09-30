@@ -84,7 +84,8 @@ class FrestqApp(Flask):
                 help="filter items, with \"key=value\" ", default=[])
             parser.add_argument("--tree",
                                 help="prints the tree of related tasks")
-            parser.add_argument("--show", help="prints a task in detail")
+            parser.add_argument("--show-task", help="prints a task in detail")
+            parser.add_argument("--show-message", help="prints a task in detail")
             parser.add_argument("--show-external", help="prints an external task details")
             parser.add_argument("--finish", help="finish an external task",
                                 nargs=2, default=None)
@@ -112,8 +113,11 @@ class FrestqApp(Flask):
             elif pargs.tree:
                 task_tree(pargs)
                 return
-            elif pargs.show:
+            elif pargs.show_task:
                 show_task(pargs)
+                return
+            elif pargs.show_message:
+                show_message(pargs)
                 return
             elif pargs.show_external:
                 show_external_task(pargs)
@@ -184,7 +188,7 @@ app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
 from .utils import (list_messages, list_tasks, task_tree, show_task,
-                    show_external_task, finish_task)
+                    show_message, show_external_task, finish_task)
 
 if __name__ == "__main__":
     app.run(parse_args=True)
