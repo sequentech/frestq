@@ -120,7 +120,8 @@ def reserve_task(task_id):
 
     # 2. generate reservation data
     task_instance = BaseTask.instance_by_model(task)
-    if task_instance.action_handler_object:
+    if task_instance.action_handler_object and\
+            hasattr(task_instance.action_handler_object, "reserve"):
         task_instance.action_handler_object.reserve()
 
     # 3. send reserved message to sender
@@ -166,11 +167,13 @@ def reserve_task(task_id):
                 db.session.commit()
 
                 task = BaseTask.instance_by_model(task_model)
+                task_output = None
                 try:
                     task_output = task.run_action_handler()
                 except Exception, e:
                     task.error = e
                     task.propagate = True
+                    import traceback; traceback.print_exc()
                     if task.action_handler_object:
                         task.action_handler_object.error(e)
 
@@ -179,7 +182,6 @@ def reserve_task(task_id):
 
                 # 7. update asynchronously the task sender if requested
                 if task.propagate:
-                    import traceback; traceback.print_last()
                     task_model.status = "error"
                     task_model.last_modified_date = datetime.utcnow()
                     db.session.add(task_model)
@@ -220,7 +222,8 @@ def cancel_reserved_subtask(task_id):
     task_instance = BaseTask.instance_by_model(task)
     # task action_handler_object might not be present, it's not mandatory, and
     # only provided in the task receiver node
-    if task_instance.action_handler_object:
+    if task_instance.action_handler_object and\
+            hasattr(task_instance.action_handler_object, "cancel_reservation"):
         task_instance.action_handler_object.cancel_reservation()
 
     if task.status not in ['syncing', 'reserved']:
@@ -359,7 +362,8 @@ def director_confirm_task_reservation(msg):
     sched.add_date_job(director_cancel_reserved_subtask, date, [task.id])
 
     # call to the new_reservation handler
-    if parent_instance.action_handler_object:
+    if parent_instance.action_handler_object and\
+            hasattr(parent_instance.action_handler_object, "new_reservation"):
         parent_instance.action_handler_object.new_reservation(task_instance)
 
     # find any unreserved task, send reservation
@@ -373,7 +377,8 @@ def director_confirm_task_reservation(msg):
     if not_reserved_children_num != 0:
         return
 
-    if parent_instance.action_handler_object:
+    if parent_instance.action_handler_object and\
+            hasattr(parent_instance.action_handler_object, "pre_execute"):
         parent_instance.action_handler_object.pre_execute()
 
     # start all children in parallel
@@ -390,7 +395,8 @@ def director_cancel_reserved_subtask(task_id):
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     task_instance = BaseTask.instance_by_model(task)
-    if task_instance.get_parent().action_handler_object:
+    if task_instance.get_parent().action_handler_object and\
+            hasattr(task_instance.get_parent().action_handler_object, "cancelled_reservation"):
         task_instance.get_parent().action_handler_object.cancelled_reservation(task_instance)
 
     if task.status != 'reserved':
