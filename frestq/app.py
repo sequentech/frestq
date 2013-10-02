@@ -85,6 +85,8 @@ class FrestqApp(Flask):
             parser.add_argument("--tree",
                                 help="prints the tree of related tasks")
             parser.add_argument("--show-task", help="prints a task in detail")
+            parser.add_argument("--console", help="frestq command line",
+                                action="store_true")
             parser.add_argument("--show-message", help="prints a task in detail")
             parser.add_argument("--show-external", help="prints an external task details")
             parser.add_argument("--finish", help="finish an external task",
@@ -124,6 +126,9 @@ class FrestqApp(Flask):
                 return
             elif pargs.finish:
                 finish_task(pargs)
+                return
+            elif pargs.console:
+                import ipdb; ipdb.set_trace()
                 return
 
         # ignore these threaded or use_reloader, we force those two
