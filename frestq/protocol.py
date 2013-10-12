@@ -391,13 +391,15 @@ def director_cancel_reserved_subtask(task_id):
     '''
     from .app import db
     from .models import Task as ModelTask
-    from .tasks import BaseTask
+    from .tasks import BaseTask, send_synchronization_message
 
     task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     task_instance = BaseTask.instance_by_model(task)
-    if task_instance.get_parent().action_handler_object and\
-            hasattr(task_instance.get_parent().action_handler_object, "cancelled_reservation"):
-        task_instance.get_parent().action_handler_object.cancelled_reservation(task_instance)
+    parent_instance = task_instance.get_parent()
+
+    if parent_instance.action_handler_object and\
+            hasattr(parent_instance.action_handler_object, "cancelled_reservation"):
+        parent_instance.action_handler_object.cancelled_reservation(task_instance)
 
     if task.status != 'reserved':
         return
