@@ -68,9 +68,8 @@ def post_message(queue_name):
     from .models import Message
 
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
-    try:
-        data = loads(request.data)
-    except:
+    data = request.get_json(force=True, silent=True)
+    if not data:
         return error(400, "invalid json")
 
     # check input data

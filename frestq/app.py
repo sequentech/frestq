@@ -24,12 +24,64 @@ from fscheduler import FScheduler
 
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask import json as json_flask
+from flask.wrappers import Request, _missing, _get_data
+
+from .utils import loads
 
 logging.basicConfig(level=logging.DEBUG)
+
+class FrestqRequest(Request):
+    '''
+    We have to customize request so that by default it can overload the json
+    object_hook for json.loads() so that it auto-parses datetimes
+    '''
+
+    def get_json(self, force=False, silent=False, cache=True):
+        """Parses the incoming JSON request data and returns it.  If
+        parsing fails the :meth:`on_json_loading_failed` method on the
+        request object will be invoked.  By default this function will
+        only load the json data if the mimetype is ``application/json``
+        but this can be overriden by the `force` parameter.
+
+        :param force: if set to `True` the mimetype is ignored.
+        :param silent: if set to `False` this method will fail silently
+                       and return `False`.
+        :param cache: if set to `True` the parsed JSON data is remembered
+                      on the request.
+        """
+        rv = getattr(self, '_cached_json', _missing)
+        if rv is not _missing:
+            return rv
+
+        if self.mimetype != 'application/json' and not force:
+            return None
+
+        # We accept a request charset against the specification as
+        # certain clients have been using this in the past.  This
+        # fits our general approach of being nice in what we accept
+        # and strict in what we send out.
+        request_charset = self.mimetype_params.get('charset')
+        try:
+            data = _get_data(self, cache)
+            if request_charset is not None:
+                rv = loads(data, encoding=request_charset)
+            else:
+                rv = loads(data)
+        except ValueError as e:
+            if silent:
+                rv = None
+            else:
+                rv = self.on_json_loading_failed(e)
+        if cache:
+            self._cached_json = rv
+        return rv
 
 class FrestqApp(Flask):
     def __init__(self, *args, **kwargs):
         super(FrestqApp, self).__init__(*args, **kwargs)
+
+    request_class = FrestqRequest
 
     def configure_app(self, config_object=None):
         '''
