@@ -884,7 +884,7 @@ def send_synchronization_message(task_id):
         "task_id": task.id
     }
     send_message(msg)
-    task.last_modified_date = datetime.utcnow()
+    task.last_modified_date = datetime.now()
     db.session.add(task)
     db.session.commit()
 
@@ -1177,7 +1177,7 @@ def send_task_update(task_id):
     }
     logging.debug("update_msg.inputdata: %s" % dumps(update_msg["input_data"]))
     send_message(update_msg)
-    task.last_modified_date = datetime.utcnow()
+    task.last_modified_date = datetime.now()
     db.session.add(task)
     db.session.commit()
 
