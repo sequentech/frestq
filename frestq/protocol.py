@@ -251,7 +251,7 @@ def ack_reservation(task_id):
     # reservation_timeout is also sent
 
     logging.debug("SENDING ACK RESERVATION TO SENDER of task with id %s", task_id)
-    date = datetime.now() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
+    expire_secs = app.config.get('RESERVATION_TIMEOUT')
     task = ModelTask.query.get(task_id)
     msg = {
         "action": "frestq.confirm_task_reservation",
@@ -260,7 +260,7 @@ def ack_reservation(task_id):
         "receiver_ssl_cert": task.sender_ssl_cert,
         "input_data": {
             'reservation_data': task.reservation_data,
-            'reservation_expiration_date': date,
+            'reservation_expiration_seconds': expire_secs,
         },
         "task_id": task.id
     }
@@ -360,7 +360,8 @@ def director_confirm_task_reservation(msg):
 
     # set reservation timeout
     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-    date = msg.input_data['reservation_expiration_date']
+    expire_secs = msg.input_data['reservation_expiration_seconds']
+    date = msg.created_date + timedelta(seconds=expire_secs)
     sched.add_date_job(director_cancel_reserved_subtask, date, [task.id])
 
     # call to the new_reservation handler
