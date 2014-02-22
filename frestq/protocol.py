@@ -90,7 +90,7 @@ def update_task(msg):
                 logging.debug("SETTING TASK FIELD '%s' to: %s" % (key,
                     dumps(msg.input_data[key])))
             setattr(task, key, msg.input_data[key])
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
 
@@ -126,14 +126,14 @@ def reserve_task(task_id):
 
     # 3. send reserved message to sender
     task.status = 'reserved'
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
     ack_reservation(task_id)
 
     # 4. set reservation timeout
     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-    date = datetime.now() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
+    date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
     sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
     # 5. wait for a cancel or execute message
@@ -162,7 +162,7 @@ def reserve_task(task_id):
                 from .tasks import BaseTask, update_task
                 task_model = task
                 task_model.status = 'executing'
-                task_model.last_modified_date = datetime.now()
+                task_model.last_modified_date = datetime.utcnow()
                 db.session.add(task_model)
                 db.session.commit()
 
@@ -183,12 +183,12 @@ def reserve_task(task_id):
                 # 7. update asynchronously the task sender if requested
                 if task.propagate:
                     task_model.status = "error"
-                    task_model.last_modified_date = datetime.now()
+                    task_model.last_modified_date = datetime.utcnow()
                     db.session.add(task_model)
                     db.session.commit()
                 elif task.auto_finish_after_handler:
                     task_model.status = "finished"
-                    task_model.last_modified_date = datetime.now()
+                    task_model.last_modified_date = datetime.utcnow()
                     db.session.add(task_model)
                     db.session.commit()
 
@@ -230,7 +230,7 @@ def cancel_reserved_subtask(task_id):
         return
 
     task.status = "created"
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
     with _reserve_condition:
@@ -312,7 +312,7 @@ def synchronize_task(msg):
             task.task_type = 'sequential'
 
         task.status = 'syncing'
-        task.last_modified_date = datetime.now()
+        task.last_modified_date = datetime.utcnow()
         db.session.add(task)
         db.session.commit()
 
@@ -322,7 +322,7 @@ def synchronize_task(msg):
     # schedule expiration
     if task.expiration_date:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-        date = datetime.now() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
+        date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
         sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
 
@@ -352,7 +352,7 @@ def director_confirm_task_reservation(msg):
 
     task.status = 'reserved'
     task.reservation_data = msg.input_data.get('reservation_data', None)
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
 
@@ -408,7 +408,7 @@ def director_cancel_reserved_subtask(task_id):
         return
 
     task.status = "created"
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
 
@@ -476,7 +476,7 @@ def execute_synchronized(msg):
     task_instance = BaseTask.instance_by_model(task)
     task.input_data = msg.input_data['input_data']
     task.status = "confirmed"
-    task.last_modified_date = datetime.now()
+    task.last_modified_date = datetime.utcnow()
     db.session.add(task)
     db.session.commit()
     with _reserve_condition:

@@ -180,7 +180,7 @@ class Message(db.Model):
 
     receiver_ssl_cert = db.Column(db.UnicodeText)
 
-    created_date = db.Column(db.DateTime, default=datetime.now)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
 
     action = db.Column(db.Unicode(1024))
 
@@ -277,9 +277,9 @@ class Task(db.Model):
 
     receiver_ssl_cert = db.Column(db.UnicodeText)
 
-    created_date = db.Column(db.DateTime, default=datetime.now)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-    last_modified_date = db.Column(db.DateTime, default=datetime.now)
+    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow)
 
     input_data = db.Column(JSONEncodedDict)
 
