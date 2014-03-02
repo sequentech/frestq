@@ -618,6 +618,8 @@ class SequentialTask(BaseTask):
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
+        # fix broken FK bug, when child added to parent that does not yet exist
+        db.session.add(self.task_model)
         # create also subtasks
         i = 0
         for subtask in self._subtasks:
@@ -626,7 +628,8 @@ class SequentialTask(BaseTask):
             subtask_model.parent_id = self.task_model.id
             db.session.add(subtask_model)
             i += 1
-        db.session.add(self.task_model)
+        # fix broken FK bug, when child added to parent that does not yet exist
+        # db.session.add(self.task_model)
         db.session.commit()
         return self.task_model
 
@@ -776,6 +779,8 @@ class ParallelTask(BaseTask):
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
+        # fix broken FK bug, when child added to parent that does not yet exist
+        db.session.add(self.task_model)
         # create also subtasks
         i = 0
         for subtask in self._subtasks:
@@ -783,7 +788,8 @@ class ParallelTask(BaseTask):
             subtask_model.parent_id = self.task_model.id
             db.session.add(subtask_model)
             i += 1
-        db.session.add(self.task_model)
+        # fix broken FK bug, when child added to parent that does not yet exist
+        # db.session.add(self.task_model)
         db.session.commit()
         return self.task_model
 

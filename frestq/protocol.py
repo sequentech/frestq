@@ -68,7 +68,10 @@ def update_task(msg):
     from .models import Task as ModelTask
     from .tasks import BaseTask
 
-    task = msg.task
+    # fixed broken FK bug, when taskid exists in a non local db
+    # task = msg.task
+    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+
     logging.debug("UPDATING TASK with id %s" % task.id)
     if not task or\
             (task.status == "finished" and msg.input_data['status'] != 'error'):

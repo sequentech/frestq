@@ -194,10 +194,11 @@ class Message(db.Model):
 
     info_text = db.Column(db.Unicode(2048))
 
-    task_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
-
-    task = db.relationship('Task',
-        backref=db.backref('messages', lazy='dynamic'))
+    # fixed broken FK bug, when taskid exists in a non local db
+    # task_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
+    #task = db.relationship('Task',
+    #    backref=db.backref('messages', lazy='dynamic'))
+    task_id = db.Column(db.Unicode(128))
 
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
