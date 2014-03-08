@@ -63,10 +63,8 @@ def loads(obj, **kwargs):
     '''
     return json.loads(obj, object_hook=datetime_decoder, **kwargs)
 
-def list_tasks(args):
-    '''
-    Prints the list of tasks
-    '''
+# drb
+def get_tasks(args):
     from .app import db
     from .models import Task
 
@@ -81,10 +79,20 @@ def list_tasks(args):
         tasks = db.session.query(Task)
     tasks = tasks.order_by(Task.created_date.desc()).limit(args.limit)
 
+    return tasks
+
+# drb
+def list_tasks(args):
+    '''
+    Prints the list of tasks
+    '''
+    tasks = get_tasks(args)
+
     table = PrettyTable(['small id', 'sender_url', 'action', 'queue',
                          'task_type', 'status', 'created_date'])
 
     for task in tasks:
+        dict = task.to_dict()
         table.add_row([str(task.id)[:8], task.sender_url, task.action,
                        task.queue_name, task.task_type, task.status,
                        task.created_date])
@@ -177,12 +185,21 @@ def show_message(args):
     msg_model = msg_model[0]
     print dumps(msg_model.to_dict(), indent=4)
 
-def show_external_task(args):
+# drb
+def get_external_task(args):
     from .app import db
     from .models import Task
 
     task_id = unicode(args.show_external)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+
+    return task_model
+
+# drb
+def show_external_task(args):
+
+    task_id = unicode(args.show_external)
+    task_model = get_external_task(args)
 
     if not task_model:
         print "task %s not found" % task_id
