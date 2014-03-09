@@ -9,7 +9,6 @@ Werkzeug==0.9.4
 argparse==1.2.1
 cffi==0.8.1
 cryptography==0.2.2
-frestq==0.0.1
 ipdb==0.8
 ipython==1.2.1
 itsdangerous==0.23
