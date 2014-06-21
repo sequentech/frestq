@@ -173,9 +173,11 @@ def reserve_task(task_id):
                 task_output = None
                 try:
                     task_output = task.run_action_handler()
+                    db.session.commit()
                 except Exception, e:
                     task.error = e
                     task.propagate = True
+                    db.session.commit()
                     import traceback; traceback.print_exc()
                     if task.action_handler_object:
                         task.action_handler_object.error(e)

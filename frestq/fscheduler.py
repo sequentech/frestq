@@ -109,11 +109,32 @@ class FScheduler(Scheduler):
         :type date: :class:`datetime.date`
         :rtype: :class:`~apscheduler.job.Job`
         """
+        from .app import db
 
         logging.info("adding job in sched for queue %s" % self.queue_name)
         trigger = NowTrigger()
         options['max_runs'] = 1
+
+        # autocommit to avoid dangling sessions
+        def autocommit_wrapper(*args, **kwargs2):
+            func(*args, **kwargs2)
+            db.session.commit()
+
         if 'misfire_grace_time' not in options:
             # default to misfire_grace_time of 24 hours!
             options['misfire_grace_time'] = 3600*24
-        return self.add_job(trigger, func, args, kwargs, **options)
+
+        return self.add_job(trigger, autocommit_wrapper, args, kwargs,
+                            **options)
+
+    def add_date_job(self, func, date, args=None, kwargs=None, **options):
+        from .app import db
+
+        # autocommit to avoid dangling sessions
+        def autocommit_wrapper(*args, **kwargs2):
+            func(*args, **kwargs2)
+            db.session.commit()
+
+        return super(FScheduler, self).add_date_job(autocommit_wrapper,
+                                                    date, args, kwargs,
+                                                    **options)

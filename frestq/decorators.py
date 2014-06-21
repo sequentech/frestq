@@ -21,7 +21,6 @@ import types
 from functools import wraps
 from flask import request
 
-from .app import app
 from .action_handlers import ActionHandlers
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 from .utils import DecoratorBase
@@ -77,10 +76,10 @@ def task(action, queue, **kwargs):
 
 class local_task(DecoratorBase):
     '''
-    Use to assure that the task is send from local. This is checked in a secure
+    Use to assure that the task is sent from local. This is checked in a secure
     way by checking that the sender SSL certificate is the one specified.
 
-    NOTE: if you use this decorator in an TaskHandler, put it before the task
+    NOTE: if you use this decorator in a TaskHandler, put it before the task
     decorator or it won't work. Do it as shown in the following code example:
 
     from frestq import decorators
@@ -93,6 +92,7 @@ class local_task(DecoratorBase):
     '''
     def __call__(self, *args):
         from .protocol import certs_differ, SecurityException
+        from .app import app
 
         if  type(self.func) is types.ClassType:
             task = self.func.task

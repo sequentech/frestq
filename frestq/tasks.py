@@ -1263,20 +1263,24 @@ def post_task(msg, action_handler):
 
     # 2. call to the handler
     task = BaseTask.instance_by_model(task_model)
+    task_output = None
     try:
         task_output = task.run_action_handler()
-        if task_output:
-            update_task(task, task_output)
+        db.session.commit()
     except Exception, e:
         import traceback; traceback.print_exc()
         task.error = e
         task.propagate = True
+        db.session.commit()
         if task.action_handler_object:
             try:
                 task.action_handler_object.handle_error(e)
             except:
                 task.propagate = True
             print "after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate)
+
+    if task_output:
+        update_task(task, task_output)
 
     # 3. update asynchronously the task sender if requested
     if task.auto_finish_after_handler or task.propagate:
