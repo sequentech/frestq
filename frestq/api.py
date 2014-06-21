@@ -95,6 +95,12 @@ def post_message(queue_name):
 
     # check for a local message
     if data['sender_url'] == current_app.config.get('ROOT_URL'):
+        # check that the certificate is really local
+        from .protocol import certs_differ, SecurityException
+        local_ssl_cert = current_app.config['SSL_CERT_STRING']
+        if certs_differ(sender_ssl_cert, local_ssl_cert):
+            raise SecurityException()
+
         logging.debug('The MESSAGE is LOCAL and with id %s' % data['message_id'])
         msg = Message.query.get(data['message_id'])
     else:
