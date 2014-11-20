@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013  Eduardo Robles Elvira <edulix AT wadobo DOT com>
+# Copyright (C) 2013, 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -79,9 +79,14 @@ class FrestqRequest(Request):
 
 class FrestqApp(Flask):
     def __init__(self, *args, **kwargs):
+        if 'parse_args' in kwargs:
+            del kwargs['parse_args']
+            self.parse_args()
         super(FrestqApp, self).__init__(*args, **kwargs)
 
     request_class = FrestqRequest
+
+    pargs = None
 
     def configure_app(self, config_object=None):
         '''
@@ -115,71 +120,80 @@ class FrestqApp(Flask):
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
         FScheduler.start_all_schedulers()
 
+    def parse_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--createdb", help="create the database",
+                            action="store_true")
+        parser.add_argument("--messages", help="list last messages",
+                            action="store_true")
+        parser.add_argument("--tasks", help="list last tasks",
+                            action="store_true")
+        parser.add_argument("--filters", nargs='+',
+            help="filter items, with \"key=value\" ", default=[])
+        parser.add_argument("--tree",
+                            help="prints the tree of related tasks")
+        parser.add_argument("--show-task", help="prints a task in detail")
+        parser.add_argument("--console", help="frestq command line",
+                            action="store_true")
+        parser.add_argument("--show-message", help="prints a task in detail")
+        parser.add_argument("--show-external", help="prints an external task details")
+        parser.add_argument("--finish", help="finish an external task",
+                            nargs=2, default=None)
+        parser.add_argument("--with-parents",
+                            help="show in the tree parent tasks too",
+                            action="store_true")
+        parser.add_argument("-n", "--limit", help="limit number of results",
+                            type=int, default=20)
+        parser.add_argument("-ll", "--log-level", default=None,
+                            help="show verbose output. set to ERROR by default",
+                            choices=["debug","info", "error"])
+        self.pargs = parser.parse_args()
+
+        if self.pargs.limit < 1:
+            print "limit must be >= 1"
+            return
+
+        if self.pargs.log_level != None:
+            if self.pargs.log_level == "debug":
+                logging.getLogger().setLevel(logging.DEBUG)
+            elif self.pargs.log_level == "info":
+                logging.getLogger().setLevel(logging.INFO)
+            elif self.pargs.log_level == "error":
+                logging.getLogger().setLevel(logging.ERROR)
+
     def run(self, *args, **kwargs):
         '''
         Reimplemented the run function.
 
         parse_args can be provided if you want yo parse the app arguments
         '''
-        if kwargs.get('parse_args', False):
-            # remove parse_args as it's not recognized by super
-            del kwargs['parse_args']
-
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--createdb", help="create the database",
-                                action="store_true")
-            parser.add_argument("--messages", help="list last messages",
-                                action="store_true")
-            parser.add_argument("--tasks", help="list last tasks",
-                                action="store_true")
-            parser.add_argument("--filters", nargs='+',
-                help="filter items, with \"key=value\" ", default=[])
-            parser.add_argument("--tree",
-                                help="prints the tree of related tasks")
-            parser.add_argument("--show-task", help="prints a task in detail")
-            parser.add_argument("--console", help="frestq command line",
-                                action="store_true")
-            parser.add_argument("--show-message", help="prints a task in detail")
-            parser.add_argument("--show-external", help="prints an external task details")
-            parser.add_argument("--finish", help="finish an external task",
-                                nargs=2, default=None)
-            parser.add_argument("--with-parents",
-                                help="show in the tree parent tasks too",
-                                action="store_true")
-            parser.add_argument("-n", "--limit", help="limit number of results",
-                                type=int, default=20)
-            pargs = parser.parse_args()
-
-            if pargs.limit < 1:
-                print "limit must be >= 1"
-                return
-
-            if pargs.createdb:
+        if self.pargs is not None:
+            if self.pargs.createdb:
                 print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
                 db.create_all()
                 return
-            elif pargs.messages:
-                list_messages(pargs)
+            elif self.pargs.messages:
+                list_messages(self.pargs)
                 return
-            elif pargs.tasks:
-                list_tasks(pargs)
+            elif self.pargs.tasks:
+                list_tasks(self.pargs)
                 return
-            elif pargs.tree:
-                task_tree(pargs)
+            elif self.pargs.tree:
+                task_tree(self.pargs)
                 return
-            elif pargs.show_task:
-                show_task(pargs)
+            elif self.pargs.show_task:
+                show_task(self.pargs)
                 return
-            elif pargs.show_message:
-                show_message(pargs)
+            elif self.pargs.show_message:
+                show_message(self.pargs)
                 return
-            elif pargs.show_external:
-                show_external_task(pargs)
+            elif self.pargs.show_external:
+                show_external_task(self.pargs)
                 return
-            elif pargs.finish:
-                finish_task(pargs)
+            elif self.pargs.finish:
+                finish_task(self.pargs)
                 return
-            elif pargs.console:
+            elif self.pargs.console:
                 import ipdb; ipdb.set_trace()
                 return
 
@@ -197,7 +211,7 @@ class FrestqApp(Flask):
         return super(FrestqApp, self).run(threaded=True, use_reloader=False,
                                           *args, **kwargs)
 
-app = FrestqApp(__name__)
+app = FrestqApp(__name__, parse_args=True)
 
 ### configuration
 
@@ -248,4 +262,4 @@ from .utils import (list_messages, list_tasks, task_tree, show_task,
                     show_message, show_external_task, finish_task)
 
 if __name__ == "__main__":
-    app.run(parse_args=True)
+    app.run()
