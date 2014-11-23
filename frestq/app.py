@@ -117,6 +117,12 @@ class FrestqApp(Flask):
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
 
+        if self.pargs.createdb or self.pargs.messages or self.pargs.tasks or\
+                self.pargs.tree or self.pargs.show_task or\
+                self.pargs.show_message or self.pargs.show_external or\
+                self.pargs.finish or self.pargs.show_activity:
+            return
+
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
         FScheduler.start_all_schedulers()
 
@@ -137,6 +143,8 @@ class FrestqApp(Flask):
                             action="store_true")
         parser.add_argument("--show-message", help="prints a task in detail")
         parser.add_argument("--show-external", help="prints an external task details")
+        parser.add_argument("--show-activity", help="prints activity",
+                            action="store_true")
         parser.add_argument("--finish", help="finish an external task",
                             nargs=2, default=None)
         parser.add_argument("--with-parents",
@@ -164,8 +172,6 @@ class FrestqApp(Flask):
     def run(self, *args, **kwargs):
         '''
         Reimplemented the run function.
-
-        parse_args can be provided if you want yo parse the app arguments
         '''
         if self.pargs is not None:
             if self.pargs.createdb:
@@ -189,9 +195,11 @@ class FrestqApp(Flask):
                 return
             elif self.pargs.show_external:
                 show_external_task(self.pargs)
-                return
             elif self.pargs.finish:
                 finish_task(self.pargs)
+                return
+            elif self.pargs.show_activity:
+                show_activity(self.pargs)
                 return
             elif self.pargs.console:
                 import ipdb; ipdb.set_trace()
@@ -259,7 +267,8 @@ app.register_blueprint(api, url_prefix='/api')
 
 from . import protocol
 from .utils import (list_messages, list_tasks, task_tree, show_task,
-                    show_message, show_external_task, finish_task)
+                    show_message, show_external_task, finish_task,
+                    show_activity)
 
 if __name__ == "__main__":
     app.run()

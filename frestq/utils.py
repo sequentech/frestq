@@ -18,7 +18,9 @@
 from __future__ import unicode_literals
 
 import datetime
+import os
 import json
+import codecs
 
 from prettytable import PrettyTable
 
@@ -173,6 +175,83 @@ def show_task(args):
         return
     task_model = task_model[0]
     print_task(task_model)
+
+
+def show_activity(args):
+    from .app import app
+    root_path = app.config.get('ROOT_PATH', "")
+    activity_path = os.path.join(root_path, "activity.json.log")
+    data = dict(
+      start_date=None,
+      pools=dict()
+    )
+    with codecs.open(activity_path, encoding='utf-8', mode='r') as activity_f:
+        for line in activity_f:
+            action = json.loads(line)
+            action_name = action['activity']['action']
+            if action_name == 'START':
+                data = dict(
+                    start_date=action['time'],
+                    pools=dict()
+                )
+            elif action_name == 'CREATE_QUEUE':
+                queue_name = action['activity']['queue']
+                if queue_name in data['pools']:
+                    continue
+                data['pools'][queue_name] = dict(
+                    creation_date=action['time'],
+                    executing=[],
+                    errors=0)
+            elif action_name == 'SET_QUEUE_MAX':
+                queue_name = action['activity']['queue']
+                if queue_name not in data['pools']:
+                    data['pools'][queue_name] = dict(
+                        creation_date=action['time'],
+                        executing=[],
+                        errors=0)
+                data['pools'][queue_name]['max'] = action['activity']['max']
+            elif action_name == 'EVENT_JOB_LAUNCHING':
+                queue_name = action['activity']['queue']
+                task = dict(
+                    func_name=action['activity']['func_name'],
+                    launch_time=action['time']
+                )
+                if queue_name not in data['pools']:
+                    print("error, launching event in an inexistant queue? queue '%s'" % queue_name)
+                    continue
+                data['pools'][queue_name]['executing'].append(task)
+            elif action_name == 'EVENT_JOB_ERROR':
+                queue_name = action['activity']['queue']
+                func_name=action['activity']['func_name']
+                found = False
+                if queue_name not in data['pools']:
+                    print("error, error of an event in an inexistant queue? queue '%s'" % queue_name)
+                    continue
+                for task in data['pools'][queue_name]['executing']:
+                    if task['func_name'] == func_name:
+                        data['pools'][queue_name]['executing'].remove(task)
+                        found = True
+                        break
+                if not found:
+                    print("error,r error of an unregistered event in queue '%s'" % queue_name)
+                ['pools'][queue_name]['errors'] += 1
+            elif action_name == 'EVENT_JOB_EXECUTED':
+                queue_name = action['activity']['queue']
+                func_name=action['activity']['func_name']
+                found = False
+                if queue_name not in data['pools']:
+                    print("error, error of an event in an inexistant queue? queue '%s'" % queue_name)
+                    continue
+                for task in data['pools'][queue_name]['executing']:
+                    if task['func_name'] == func_name:
+                        data['pools'][queue_name]['executing'].remove(task)
+                        found = True
+                        break
+                if not found:
+                    print("error, finished an unregistered event in queue '%s'" % queue_name)
+
+    print(json.dumps(data, indent=4, sort_keys=True, ensure_ascii=False))
+
 
 def show_message(args):
     from .app import db
