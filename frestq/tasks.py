@@ -21,6 +21,7 @@ import logging
 import json
 import types
 import OpenSSL
+from threading import Lock
 
 import copy
 from uuid import uuid4
@@ -129,20 +130,11 @@ class BaseTask(object):
         '''
         return copy.deepcopy(self.task_model.to_dict())
 
-    def set_output_data(self, data, send_update_to_sender=False):
+    def set_output_data(self, data):
         '''
         Setter of a task's output data.
         '''
         self.task_model.output_data = data
-        if send_update_to_sender:
-            db.session.add(self.task_model)
-            db.session.commit()
-
-            # if task is local, there's no update neeeded
-            if self.task_model.is_local:
-                return
-            sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-            sched.add_now_job(send_task_update, [self.task_model.id])
 
     @staticmethod
     def instance_by_id(task_id):
@@ -723,6 +715,9 @@ class ParallelTask(BaseTask):
     '''
     _subtasks = []
 
+    # used to remove race conditions
+    _db_lock = Lock()
+
     def __init__(self, label=""):
         '''
         Constructor, takes no arguments as it is a virtual task.
@@ -823,48 +818,59 @@ class ParallelTask(BaseTask):
         if self.task_model.status == 'error':
             return
 
-        num_unfinished_subtasks = self.count_unfinished_subtasks()
+        try:
+            self._db_lock.acquire()
+            num_unfinished_subtasks = self.count_unfinished_subtasks()
 
-        # if we find an error, propagate, as this kind of task do not have an
-        # action handler that can stop it
-        errored_tasks = self.errored_tasks()
-        if errored_tasks.count() > 0:
-            self.error = SubTasksFailed(errored_tasks)
-            self.task_model.status = "error"
-            db.session.add(self.task_model)
-            db.session.commit()
+            # if we find an error, propagate, as this kind of task do not have an
+            # action handler that can stop it
+            errored_tasks = self.errored_tasks()
+            if errored_tasks.count() > 0:
+                self.error = SubTasksFailed(errored_tasks)
+                self.task_model.status = "error"
+                db.session.add(self.task_model)
+                db.session.commit()
+                self._db_lock.release()
 
-            # propagate
-            self.execute_parent()
-            return
+                # propagate
+                self.execute_parent()
+                return
 
-        # if this is the first time do next is called and there are subtasks,
-        # let's mark this task as executing and start all the subtasks in
-        # parallel
-        if self.task_model.status in ['created', 'sent'] and num_unfinished_subtasks > 0:
-            # mark as executing this task
-            self.task_model.status = "executing"
-            db.session.add(self.task_model)
-            db.session.commit()
+            # if this is the first time do next is called and there are subtasks,
+            # let's mark this task as executing and start all the subtasks in
+            # parallel
+            if self.task_model.status in ['created', 'sent'] and num_unfinished_subtasks > 0:
+                # mark as executing this task
+                self.task_model.status = "executing"
+                db.session.add(self.task_model)
+                db.session.commit()
+                self._db_lock.release()
 
-            # start subtasks in parallel
-            subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
-            for subtask in subtasks:
-                sched = FScheduler.get_scheduler(subtask.queue_name)
-                sched.add_now_job(execute_task, [subtask.id])
-            return
+                # start subtasks in parallel
+                subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
+                for subtask in subtasks:
+                    sched = FScheduler.get_scheduler(subtask.queue_name)
+                    sched.add_now_job(execute_task, [subtask.id])
+                return
 
 
-        # check if there's no subtask left to do, and send the do next signal
-        # for parent task if it has one
-        if num_unfinished_subtasks == 0:
-            # mark as finished
-            self.task_model.status = "finished"
-            db.session.add(self.task_model)
-            db.session.commit()
+            # check if there's no subtask left to do, and send the do next signal
+            # for parent task if it has one
+            if num_unfinished_subtasks == 0:
+                # mark as finished
+                self.task_model.status = "finished"
+                db.session.add(self.task_model)
+                db.session.commit()
+                self._db_lock.release()
 
-            # check if there's a parent task, and if so execute() it
-            self.execute_parent()
+                # check if there's a parent task, and if so execute() it
+                self.execute_parent()
+        finally:
+            try:
+                self._db_lock.release()
+            except:
+                # we might have released it already, don't wory about that
+                pass
 
 
 def send_synchronization_message(task_id):
@@ -913,6 +919,9 @@ class SynchronizedTask(BaseTask):
     See sychronization example for more details on how this works.
     '''
     _subtasks = []
+
+    # used to remove race conditions
+    _db_lock = Lock()
 
     handler = None
 
@@ -1019,36 +1028,47 @@ class SynchronizedTask(BaseTask):
         if self.task_model.status == 'error':
             return
 
-        num_unfinished_subtasks = self.count_unfinished_subtasks()
+        try:
+            self._db_lock.acquire()
+            num_unfinished_subtasks = self.count_unfinished_subtasks()
 
-        # if we find an error, propagate, as this kind of task do not have an
-        # action handler that can stop it
-        errored_tasks = self.errored_tasks()
-        if errored_tasks.count() > 0:
-            self.error = SubTasksFailed(errored_tasks)
-            self.task_model.status = "error"
-            db.session.add(self.task_model)
-            db.session.commit()
 
-            # propagate
-            self.execute_parent()
-            return
+            # if we find an error, propagate, as this kind of task do not have an
+            # action handler that can stop it
+            errored_tasks = self.errored_tasks()
+            if errored_tasks.count() > 0:
+                self.error = SubTasksFailed(errored_tasks)
+                self.task_model.status = "error"
+                db.session.add(self.task_model)
+                db.session.commit()
+                self._db_lock.release()
 
-        # if this is the first time do next is called and there are subtasks,
-        # let's mark this task as executing and start doing the synchronization
-        if self.task_model.status in ['created', 'sent']:
-            self._synchronize()
+                # propagate
+                self.execute_parent()
+                return
 
-        # check if there's no subtask left to do, and send the do next signal
-        # for parent task if it has one
-        elif num_unfinished_subtasks == 0:
-            self._finish()
+            # if this is the first time do next is called and there are subtasks,
+            # let's mark this task as executing and start doing the synchronization
+            if self.task_model.status in ['created', 'sent']:
+                self._synchronize()
+
+            # check if there's no subtask left to do, and send the do next signal
+            # for parent task if it has one
+            elif num_unfinished_subtasks == 0:
+                self._finish()
+        finally:
+            try:
+                self._db_lock.release()
+            except:
+                # we might have released it already, don't wory about that
+                pass
 
     def _synchronize(self):
         # mark as executing this task
         self.task_model.status = "executing"
         db.session.add(self.task_model)
         db.session.commit()
+        self._db_lock.release()
 
         # send initial synchronization message to subtasks
         subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
@@ -1064,6 +1084,7 @@ class SynchronizedTask(BaseTask):
         self.task_model.status = "finished"
         db.session.add(self.task_model)
         db.session.commit()
+        self._db_lock.release()
 
         # check if there's a parent task, and if so execute() it
         self.execute_parent()
