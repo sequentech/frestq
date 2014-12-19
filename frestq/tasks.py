@@ -820,6 +820,15 @@ class ParallelTask(BaseTask):
 
         try:
             self._db_lock.acquire()
+            db.session.commit()
+
+            # paranoid mode, do not trust old tasks. check if task finished
+            db.session.expire(self.task_model)
+            db.session.refresh(self.task_model)
+            # should have been already dealt with
+            if self.task_model.status == 'finished':
+              return
+
             num_unfinished_subtasks = self.count_unfinished_subtasks()
 
             # if we find an error, propagate, as this kind of task do not have an
@@ -1030,6 +1039,15 @@ class SynchronizedTask(BaseTask):
 
         try:
             self._db_lock.acquire()
+            db.session.commit()
+
+            # paranoid mode, do not trust old tasks. check if task finished
+            db.session.expire(self.task_model)
+            db.session.refresh(self.task_model)
+            # should have been already dealt with
+            if self.task_model.status == 'finished':
+              return
+
             num_unfinished_subtasks = self.count_unfinished_subtasks()
 
 
