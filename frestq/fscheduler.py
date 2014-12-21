@@ -19,6 +19,7 @@
 from __future__ import unicode_literals
 import logging
 import os
+from sqlalchemy import exc
 
 from apscheduler.events import *
 from apscheduler.scheduler import Scheduler
@@ -178,8 +179,13 @@ class FScheduler(Scheduler):
 
         # autocommit to avoid dangling sessions
         def autocommit_wrapper(*args, **kwargs2):
-            func(*args, **kwargs2)
-            db.session.commit()
+            try:
+              func(*args, **kwargs2)
+              db.session.commit()
+            except exc.SQLAlchemyError:
+              import traceback; traceback.print_exc()
+              logging.info("SQLAlchemy exception, doing a rollback for recovery.")
+              db.session.rollback()
 
         autocommit_wrapper.__name__ = func.__name__
 
