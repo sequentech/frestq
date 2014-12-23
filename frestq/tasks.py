@@ -1178,6 +1178,8 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
 
     # TODO: check r.status_code and do some retries if it failed
     msg.output_status = r.status_code
+    if r.status_code >= 400:
+        print("!!! ERROR request to url = '%s' and status = '%d' answered:\n%s" % (url, r.status_code, r.text))
 
     db.session.add(msg)
     db.session.commit()
