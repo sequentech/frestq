@@ -180,7 +180,7 @@ def reserve_task(task_id):
                     db.session.commit()
                     import traceback; traceback.print_exc()
                     if task.action_handler_object:
-                        task.action_handler_object.error(e)
+                        task.action_handler_object.handle_error(e)
 
                 if task_output:
                     update_task(task, task_output)
