@@ -1196,6 +1196,9 @@ class TaskError(Exception):
     def __init__(self, data):
         self.data = data
 
+    def __str__(self):
+        return "TaskError(%s)" % json.dumps(self.data)
+
 
 class SubTasksFailed(TaskError):
     def __init__(self, subtasks):
