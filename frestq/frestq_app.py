@@ -173,41 +173,47 @@ class FrestqApp(Flask):
             elif self.pargs.log_level == "error":
                 logging.getLogger().setLevel(logging.ERROR)
 
+    def run_args(self):
+        if self.pargs.createdb:
+            print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
+            from .app import db
+            db.create_all()
+            return
+        elif self.pargs.messages:
+            list_messages(self.pargs)
+            return
+        elif self.pargs.tasks:
+            list_tasks(self.pargs)
+            return
+        elif self.pargs.tree:
+            task_tree(self.pargs)
+            return
+        elif self.pargs.show_task:
+            show_task(self.pargs)
+            return
+        elif self.pargs.show_message:
+            show_message(self.pargs)
+            return
+        elif self.pargs.show_external:
+            show_external_task(self.pargs)
+        elif self.pargs.finish:
+            finish_task(self.pargs)
+            return
+        elif self.pargs.show_activity:
+            show_activity(self.pargs)
+            return
+        elif self.pargs.console:
+            import ipdb; ipdb.set_trace()
+            return
+        else:
+            self.parser.print_help()
+
     def run(self, *args, **kwargs):
         '''
         Reimplemented the run function.
         '''
         if self.pargs is not None:
-            if self.pargs.createdb:
-                print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
-                db.create_all()
-                return
-            elif self.pargs.messages:
-                list_messages(self.pargs)
-                return
-            elif self.pargs.tasks:
-                list_tasks(self.pargs)
-                return
-            elif self.pargs.tree:
-                task_tree(self.pargs)
-                return
-            elif self.pargs.show_task:
-                show_task(self.pargs)
-                return
-            elif self.pargs.show_message:
-                show_message(self.pargs)
-                return
-            elif self.pargs.show_external:
-                show_external_task(self.pargs)
-            elif self.pargs.finish:
-                finish_task(self.pargs)
-                return
-            elif self.pargs.show_activity:
-                show_activity(self.pargs)
-                return
-            elif self.pargs.console:
-                import ipdb; ipdb.set_trace()
-                return
+            self.run_args()
 
         # ignore these threaded or use_reloader, we force those two
         if 'threaded' in kwargs:
