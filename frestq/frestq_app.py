@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013, 2014 Eduardo Robles Elvira <edulix AT agoravoting DOT com>
+# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by

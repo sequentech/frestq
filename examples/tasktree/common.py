@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013  Eduardo Robles Elvira <edulix AT wadobo DOT com>
+# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -14,7 +14,6 @@
 
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
-
 
 from frestq import decorators
 
