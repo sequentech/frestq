@@ -25,9 +25,9 @@ reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='frestq',
-    version='0.0.1',
-    author='Eduardo Robles Elvira',
-    author_email='edulix@agoravoting.com',
+    version='3.2.0',
+    author='Agora Voting Team',
+    author_email='agora@agoravoting.com',
     packages=['frestq'],
     scripts=[],
     url='http://pypi.python.org/pypi/frestq/',
