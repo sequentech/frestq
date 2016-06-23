@@ -1,5 +1,5 @@
 hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler
-git+https://github.com/edulix/requests.git#egg=requests
+git+https://github.com/agoravoting/requests.git@agora#egg=requests
 Flask==0.10.1
 Flask-SQLAlchemy==1.0
 Jinja2==2.7.2
