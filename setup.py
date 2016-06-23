@@ -1,18 +1,3 @@
-# This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
-
-# frestq is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License as published by
-# the Free Software Foundation, either version 3 of the License.
-
-# frestq  is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-
-# You should have received a copy of the GNU Lesser General Public License
-# along with frestq.  If not, see <http://www.gnu.org/licenses/>.
-
 from setuptools import setup
 from pip.req import parse_requirements
 
@@ -25,9 +10,9 @@ reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='frestq',
-    version='3.2.0',
-    author='Agora Voting Team',
-    author_email='agora@agoravoting.com',
+    version='0.0.1',
+    author='Eduardo Robles Elvira',
+    author_email='edulix@agoravoting.com',
     packages=['frestq'],
     scripts=[],
     url='http://pypi.python.org/pypi/frestq/',
