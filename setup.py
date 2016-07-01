@@ -36,6 +36,6 @@ setup(
     install_requires=reqs,
     dependency_links = [
         'hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler',
-        'git+https://github.com/edulix/requests.git#egg=requests'
+        'git+https://github.com/agoravoting/requests.git@agora#egg=requests'
     ]
 )
