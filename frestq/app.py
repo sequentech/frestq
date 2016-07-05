@@ -85,7 +85,7 @@ class FrestqApp(Flask):
 
     pargs = None
 
-    def configure_app(self, config_object=None):
+    def configure_app(self, scheduler=True, config_object=None):
         '''
         Configures the application. It's intended to do everything to be able to
         run the application except calling app.run, so that it can be reused when
@@ -114,10 +114,7 @@ class FrestqApp(Flask):
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
 
-        if self.pargs.createdb or self.pargs.messages or self.pargs.tasks or\
-                self.pargs.tree or self.pargs.show_task or\
-                self.pargs.show_message or self.pargs.show_external or\
-                self.pargs.finish or self.pargs.show_activity:
+        if not scheduler:
             return
 
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
