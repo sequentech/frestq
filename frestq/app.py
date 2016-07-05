@@ -168,7 +168,7 @@ class FrestqApp(Flask):
         '''
         Reimplemented the run function.
         '''
-        if 'parse_args' in kwargs and parse_args == True:
+        if 'parse_args' in kwargs and kwargs['parse_args'] == True:
             del kwargs['parse_args']
             self.parse_args(kwargs.get('extra_parse_func', lambda a,b: None))
             
