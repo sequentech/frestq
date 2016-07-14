@@ -79,16 +79,13 @@ class FrestqRequest(Request):
 
 class FrestqApp(Flask):
     def __init__(self, *args, **kwargs):
-        if 'parse_args' in kwargs:
-            del kwargs['parse_args']
-            self.parse_args()
         super(FrestqApp, self).__init__(*args, **kwargs)
 
     request_class = FrestqRequest
 
     pargs = None
 
-    def configure_app(self, config_object=None):
+    def configure_app(self, scheduler=True, config_object=None):
         '''
         Configures the application. It's intended to do everything to be able to
         run the application except calling app.run, so that it can be reused when
@@ -117,16 +114,13 @@ class FrestqApp(Flask):
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
 
-        if self.pargs.createdb or self.pargs.messages or self.pargs.tasks or\
-                self.pargs.tree or self.pargs.show_task or\
-                self.pargs.show_message or self.pargs.show_external or\
-                self.pargs.finish or self.pargs.show_activity:
+        if not scheduler:
             return
 
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
         FScheduler.start_all_schedulers()
-
-    def parse_args(self):
+     
+    def parse_args(self, extra_parse_func):
         parser = argparse.ArgumentParser()
         parser.add_argument("--createdb", help="create the database",
                             action="store_true")
@@ -155,6 +149,7 @@ class FrestqApp(Flask):
         parser.add_argument("-ll", "--log-level", default=None,
                             help="show verbose output. set to ERROR by default",
                             choices=["debug","info", "error"])
+        extra_parse_func(self, parser)
         self.pargs = parser.parse_args()
 
         if self.pargs.limit < 1:
@@ -173,6 +168,10 @@ class FrestqApp(Flask):
         '''
         Reimplemented the run function.
         '''
+        if 'parse_args' in kwargs and kwargs['parse_args'] == True:
+            del kwargs['parse_args']
+            self.parse_args(kwargs.get('extra_parse_func', lambda a,b: None))
+            
         if self.pargs is not None:
             if self.pargs.createdb:
                 print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
@@ -204,6 +203,11 @@ class FrestqApp(Flask):
             elif self.pargs.console:
                 import ipdb; ipdb.set_trace()
                 return
+            else:
+                extra_run = kwargs.get('extra_run', lambda a: False) 
+                ret = extra_run(self)
+                if ret:
+                    return
 
         # ignore these threaded or use_reloader, we force those two
         if 'threaded' in kwargs:
@@ -219,7 +223,7 @@ class FrestqApp(Flask):
         return super(FrestqApp, self).run(threaded=True, use_reloader=False,
                                           *args, **kwargs)
 
-app = FrestqApp(__name__, parse_args=True)
+app = FrestqApp(__name__)
 
 ### configuration
 
