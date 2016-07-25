@@ -24,7 +24,7 @@ reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='frestq',
-    version='3.2.0',
+    version='3.3.0',
     author='Agora Voting Team',
     author_email='agora@agoravoting.com',
     packages=['frestq'],
