@@ -1,4 +1,4 @@
-hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler
+git+https://github.com/edulix/apscheduler#egg=apscheduler
 git+https://github.com/agoravoting/requests.git@agora#egg=requests
 Flask==0.10.1
 Flask-SQLAlchemy==1.0
@@ -8,13 +8,13 @@ SQLAlchemy==0.9.3
 Werkzeug==0.9.4
 argparse==1.2.1
 cffi==0.8.1
-cryptography==0.2.2
 ipdb==0.8
 ipython==1.2.1
 itsdangerous==0.23
 prettytable==0.7.2
-pyOpenSSL==0.14
 pycparser==2.10
 six==1.5.2
-uWSGI==2.0.2
+uWSGI==2.0.17.1
 wsgiref==0.1.2
+cryptography==2.4.2
+pyOpenSSL==18.0.0
