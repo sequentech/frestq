@@ -16,5 +16,5 @@ pycparser==2.10
 six==1.5.2
 uWSGI==2.0.17.1
 wsgiref==0.1.2
-cryptography==0.2.2
-pyOpenSSL==0.14
+cryptography==2.4.2
+pyOpenSSL==18.0.0
