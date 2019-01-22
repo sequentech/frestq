@@ -7,7 +7,7 @@ MarkupSafe==0.18
 SQLAlchemy==0.9.3
 Werkzeug==0.9.4
 argparse==1.2.1
-cffi==0.8.1
+cffi==1.11.5
 ipdb==0.8
 ipython==1.2.1
 itsdangerous==0.23
