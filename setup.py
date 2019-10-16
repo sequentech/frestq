@@ -26,8 +26,8 @@ setup(
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
     install_requires=[
-        'apscheduler @ https://github.com/edulix/apscheduler/archive/master.zip',
-        'requests @ https://github.com/agoravoting/requests/archive/agora.zip',
+        'apscheduler @ https://github.com/edulix/apscheduler/archive/master.zip#sha1=d0f0afe8929b7656623bbc0fd26bb668fa136242',
+        'requests @ https://github.com/agoravoting/requests/archive/agora.zip#sha1=19cbcfe14e903b3840b6c9e9cfed4c1a5847a352',
         'Flask==0.10.1', 
         'Flask-SQLAlchemy==1.0',
         'Jinja2==2.7.2',
