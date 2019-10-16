@@ -14,10 +14,6 @@
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
 
-# parse_requirements() returns generator of pip.req.InstallRequirement objects
-with open('requirements.txt') as f:
-    install_requires = f.read().strip().split('\n')
-
 setup(
     name='frestq',
     version='103111.8',
@@ -29,9 +25,29 @@ setup(
     license='LICENSE.AGPL3',
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
-    install_requires=install_requires,
-    dependency_links = [
-        'hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler',
-        'git+https://github.com/agoravoting/requests.git@agora#egg=requests'
-    ]
+    install_requires=[
+        'apscheduler @ https://github.com/edulix/apscheduler/archive/master.zip',
+        'requests @ https://github.com/agoravoting/requests/archive/agora.zip',
+        'Flask==0.10.1', 
+        'Flask-SQLAlchemy==1.0',
+        'Jinja2==2.7.2',
+        'MarkupSafe==0.18',
+        'SQLAlchemy==0.9.3',
+        'Werkzeug==0.9.4',
+        'argparse==1.2.1',
+        'cffi==1.11.5',
+        'ipdb==0.8',
+        'ipython==1.2.1',
+        'itsdangerous==0.23',
+        'prettytable==0.7.2',
+        'pycparser==2.10',
+        'six==1.5.2',
+        'uWSGI==2.0.17.1',
+        'wsgiref==0.1.2',
+        'cryptography==2.4.2',
+        'pyOpenSSL==19.0.0',
+        'enum34==1.1.6',
+        'ipaddress==1.0.22'
+    ],
+    dependency_links = []
 )
