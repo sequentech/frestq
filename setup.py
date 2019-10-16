@@ -13,17 +13,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
-try: # for pip >= 10
-    from pip._internal.req import parse_requirements
-except ImportError: # for pip <= 9.0.3
-    from pip.req import parse_requirements
 
 # parse_requirements() returns generator of pip.req.InstallRequirement objects
-install_reqs = parse_requirements("requirements.txt")
-
-# reqs is a list of requirement
-# e.g. ['django==1.5.1', 'mezzanine==1.4.6']
-reqs = [str(ir.req) for ir in install_reqs]
+with open('requirements.txt') as f:
+    install_requires = f.read().strip().split('\n')
 
 setup(
     name='frestq',
@@ -36,7 +29,7 @@ setup(
     license='LICENSE.AGPL3',
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
-    install_requires=reqs,
+    install_requires=install_requires,
     dependency_links = [
         'hg+https://edulix@bitbucket.org/edulix/apscheduler#egg=apscheduler',
         'git+https://github.com/agoravoting/requests.git@agora#egg=requests'
