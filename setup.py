@@ -13,6 +13,20 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
+try: # for pip >= 10
+    from pip._internal.req import parse_requirements
+    from pip._internal.download import PipSession
+except ImportError: # for pip <= 9.0.3
+    from pip.req import parse_requirements
+    from pip.download import PipSession
+
+
+# parse_requirements() returns generator of pip.req.InstallRequirement objects
+install_reqs = parse_requirements("requirements.txt", session=PipSession())
+
+# reqs is a list of requirement
+# e.g. ['django==1.5.1', 'mezzanine==1.4.6']
+reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='frestq',
@@ -25,29 +39,6 @@ setup(
     license='LICENSE.AGPL3',
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
-    install_requires=[
-        'apscheduler @ https://github.com/edulix/apscheduler/archive/master.zip#sha1=d0f0afe8929b7656623bbc0fd26bb668fa136242',
-        'requests @ https://github.com/agoravoting/requests/archive/agora.zip#sha1=19cbcfe14e903b3840b6c9e9cfed4c1a5847a352',
-        'Flask==0.10.1', 
-        'Flask-SQLAlchemy==1.0',
-        'Jinja2==2.7.2',
-        'MarkupSafe==0.18',
-        'SQLAlchemy==0.9.3',
-        'Werkzeug==0.9.4',
-        'argparse==1.2.1',
-        'cffi==1.11.5',
-        'ipdb==0.8',
-        'ipython==1.2.1',
-        'itsdangerous==0.23',
-        'prettytable==0.7.2',
-        'pycparser==2.10',
-        'six==1.5.2',
-        'uWSGI==2.0.17.1',
-        'wsgiref==0.1.2',
-        'cryptography==2.4.2',
-        'pyOpenSSL==19.0.0',
-        'enum34==1.1.6',
-        'ipaddress==1.0.22'
-    ],
+    install_requires=reqs,
     dependency_links = []
 )
