@@ -1,5 +1,5 @@
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <agora@agoravoting.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -13,13 +13,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
-try: # for pip >= 10
-    from pip._internal.req import parse_requirements
-    from pip._internal.download import PipSession
-except ImportError: # for pip <= 9.0.3
-    from pip.req import parse_requirements
-    from pip.download import PipSession
 
+from pip._internal.req import parse_requirements
+from pip._internal.download import PipSession
 
 # parse_requirements() returns generator of pip.req.InstallRequirement objects
 install_reqs = parse_requirements("requirements.txt", session=PipSession())
@@ -30,15 +26,20 @@ reqs = [str(ir.req) for ir in install_reqs]
 
 setup(
     name='frestq',
-    version='103111.8',
-    author='Agora Voting Team',
-    author_email='agora@agoravoting.com',
+    version='20.01',
+    author='nVotes Team',
+    author_email='contact@nvotes.com',
     packages=['frestq'],
     scripts=[],
     url='http://pypi.python.org/pypi/frestq/',
-    license='LICENSE.AGPL3',
+    license='LICENSE.LGPL3',
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
     install_requires=reqs,
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)"
+    ],
+    python_requires='>=3.5',
     dependency_links = []
 )

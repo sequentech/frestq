@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import json
 import OpenSSL
 import logging
@@ -86,7 +85,7 @@ def update_task(msg):
     keys = ['output_data', 'status']
     for key in keys:
         if key in msg.input_data:
-            if isinstance(msg.input_data[key], basestring):
+            if isinstance(msg.input_data[key], str):
                 logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
                     msg.input_data[key]))
             else:
@@ -174,7 +173,7 @@ def reserve_task(task_id):
                 try:
                     task_output = task.run_action_handler()
                     db.session.commit()
-                except Exception, e:
+                except Exception as e:
                     task.error = e
                     task.propagate = True
                     db.session.commit()

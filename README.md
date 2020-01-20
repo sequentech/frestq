@@ -7,7 +7,7 @@ Introduction
 frestq implements a federated rest task queue. It allows the orchestration of
 tasks with different peers with no central coordination authority.
 
-It's developed in python with flask and sqlalchemy. It uses REST Message Queuing
+It's developed in python3 with flask and sqlalchemy. It uses REST Message Queuing
 Protocol (RESTQP) for communication of tasks and updates between any two peers.
 
 Installation
@@ -20,13 +20,13 @@ time tou can proceed to install it manually as when you downloaded it:
 1. Download from the git repository if you haven't got a copy
 
 ```
-    $ git clone https://github.com/agoraciudadana/frestq && cd frestq
+    $ git clone https://github.com/agoravoting/frestq && cd frestq
 ```
 
 2. Install package and its dependencies
 
 ```
-    $ mkvirtualenv myenv
+    $ mkvirtualenv myenv -p $(which python3)
     $ pip install -r requirements.txt
     $ sudo python setup.py install
 ```
@@ -96,7 +96,7 @@ So some notes and observations about this:
 The code of server_a.py is this:
 
 ```
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from flask import Blueprint, make_response
 
 from frestq.tasks import SimpleTask
@@ -135,7 +135,7 @@ corresponds with the ROOT_URL of server B.
 The code server_b.py is:
 
 ```
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from frestq import decorators
 from frestq.app import app, run_app
 
@@ -188,7 +188,7 @@ way:
 To launch each server, **run in different terminals** the following two commands:
 
 ```
-    $ python server_a.py
+    $ python3 server_a.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5000/
@@ -198,7 +198,7 @@ To launch each server, **run in different terminals** the following two commands
 
 
 ```
-    $ python server_b.py
+    $ python3 server_b.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5001/
@@ -226,7 +226,7 @@ the output in the shell running server A:
 
 # License
 
-Copyright (C) 2013-2015 Agora Voting SL and/or its subsidiary(-ies).
+Copyright (C) 2013-2020 Agora Voting SL and/or its subsidiary(-ies).
 Contact: legal@agoravoting.com
 
 This file is part of the frestq module of the Agora Voting project.

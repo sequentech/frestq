@@ -1,8 +1,7 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,7 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import logging
 import os
 from sqlalchemy import exc
@@ -119,7 +117,7 @@ class FScheduler(Scheduler):
         FScheduler.reserve_scheduler(INTERNAL_SCHEDULER_NAME)
         queues_opts = app.config.get('QUEUES_OPTIONS', dict())
 
-        for queue_name, sched in FScheduler._schedulers.iteritems():
+        for queue_name, sched in FScheduler._schedulers.items():
             logging.info("starting %s scheduler" % queue_name)
 
             opts = queues_opts.get(queue_name, dict())

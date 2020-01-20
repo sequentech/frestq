@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -15,13 +15,12 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import requests
 import logging
 import json
-import types
 import OpenSSL
 from threading import Lock
+from inspect import isfunction
 
 import copy
 from uuid import uuid4
@@ -259,7 +258,7 @@ class BaseTask(object):
         if action_handler_data:
             self.action_handler = action_handler_data['handler_func']
 
-        if type(self.action_handler) is types.TypeType:
+        if  self.action_handler is not None and not isfunction(self.action_handler):
             self.action_handler_object = self.action_handler(self)
 
     def run_action_handler(self):
@@ -1169,7 +1168,7 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
             msg.receiver_ssl_cert = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
             if update_task_receiver_ssl_cert and task:
                 task.receiver_ssl_cert = msg.receiver_ssl_cert
-        except Exception, e:
+        except Exception as e:
             pass
 
     else:
@@ -1312,7 +1311,7 @@ def post_task(msg, action_handler):
     try:
         task_output = task.run_action_handler()
         db.session.commit()
-    except Exception, e:
+    except Exception as e:
         import traceback; traceback.print_exc()
         task.error = e
         task.propagate = True
@@ -1322,7 +1321,7 @@ def post_task(msg, action_handler):
                 task.action_handler_object.handle_error(e)
             except:
                 task.propagate = True
-            print "after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate)
+            print("after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
 
     if task_output:
         update_task(task, task_output)

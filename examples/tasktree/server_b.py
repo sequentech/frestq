@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -58,9 +58,9 @@ def hello_world(task):
     username = task.get_data()['input_data']['username']
 
     from time import sleep
-    print "hello %s! sleeping..\n" % username
+    print("hello %s! sleeping..\n" % username)
     sleep(5)
-    print "woke up! time to finish =)\n"
+    print("woke up! time to finish =)\n")
 
     subtask = ParallelTask()
     task.add(subtask)

@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,11 +16,10 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import logging
 import os
 import argparse
-from fscheduler import FScheduler
+from .fscheduler import FScheduler
 
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -153,7 +152,7 @@ class FrestqApp(Flask):
         self.pargs = parser.parse_args()
 
         if self.pargs.limit < 1:
-            print "limit must be >= 1"
+            print("limit must be >= 1")
             return
 
         if self.pargs.log_level != None:
@@ -174,7 +173,7 @@ class FrestqApp(Flask):
             
         if self.pargs is not None:
             if self.pargs.createdb:
-                print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
+                print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
                 db.create_all()
                 return
             elif self.pargs.messages:
@@ -211,10 +210,10 @@ class FrestqApp(Flask):
 
         # ignore these threaded or use_reloader, we force those two
         if 'threaded' in kwargs:
-            print "threaded provided but ignored (always set to True): ", kwargs['threaded']
+            print("threaded provided but ignored (always set to True): " + kwargs['threaded'])
             del kwargs['threaded']
         if 'use_reloader' in kwargs:
-            print "use_reloader provided but ignored (always set to True): ", kwargs['use_reloader']
+            print("use_reloader provided but ignored (always set to True): " + kwargs['use_reloader'])
             del kwargs['use_reloader']
 
         if 'port' not in kwargs:

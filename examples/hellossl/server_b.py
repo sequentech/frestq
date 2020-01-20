@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# # Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -42,7 +42,7 @@ ALLOW_ONLY_SSL_CONNECTIONS = True
 
 @decorators.task(action="hello_world", queue="say_queue")
 def hello_world(task):
-    print "I'm sleepy!..\n"
+    print("I'm sleepy!..\n")
 
     # simulate we're working hard taking our time
     from time import sleep

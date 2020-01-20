@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import json
 import logging
 from datetime import datetime
@@ -74,9 +73,9 @@ def post_message(queue_name):
 
     # check input data
     requirements = [
-        {'name': 'message_id', 'isinstance': basestring},
-        {'name': 'action', 'isinstance': basestring},
-        {'name': 'sender_url', 'isinstance': basestring},
+        {'name': 'message_id', 'isinstance': str},
+        {'name': 'action', 'isinstance': str},
+        {'name': 'sender_url', 'isinstance': str},
     ]
     for req in requirements:
         if req['name'] not in data or not isinstance(data[req['name']],
