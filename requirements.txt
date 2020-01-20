@@ -1,11 +1,11 @@
 git+https://github.com/edulix/apscheduler#egg=apscheduler
 git+https://github.com/agoravoting/requests.git@agora#egg=requests
-Flask==0.12.4
+Flask==1.0.0
 Flask-SQLAlchemy==1.0
-Jinja2==2.7.2
+Jinja2==2.10.1
 MarkupSafe==0.18
-SQLAlchemy==0.9.3
-Werkzeug==0.9.4
+SQLAlchemy==1.3.0
+Werkzeug==0.15.3
 argparse==1.2.1
 cffi==1.11.5
 ipdb==0.8
