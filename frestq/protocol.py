@@ -26,7 +26,7 @@ from flask import Blueprint, request, make_response
 from .action_handlers import ActionHandlers
 from . import decorators
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
-from .utils import dumps
+from .utils import dumps, constant_time_compare
 
 def certs_differ(cert_a, cert_b):
     '''
@@ -50,12 +50,16 @@ def certs_differ(cert_a, cert_b):
 
     # now, compare the certs for real
     ca = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_a)
-    ca_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, ca)
+    ca_dump = OpenSSL.crypto\
+        .dump_certificate(OpenSSL.crypto.FILETYPE_PEM, ca)\
+        .decode('utf-8')
 
     cb = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_b)
-    cb_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cb)
+    cb_dump = OpenSSL.crypto\
+        .dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cb)\
+        .decode('utf-8')
 
-    return ca_dump != cb_dump
+    return not constant_time_compare(ca_dump, cb_dump)
 
 
 class SecurityException(Exception):

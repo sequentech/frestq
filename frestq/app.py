@@ -36,7 +36,6 @@ class FrestqRequest(Request):
     object_hook for json.loads() so that it auto-parses datetimes
     '''
 
-
     def get_json(self, force=False, silent=False, cache=True):
         """Parse and return the data as JSON. If the mimetype does not
         indicate JSON (:mimetype:`application/json`, see
@@ -58,7 +57,7 @@ class FrestqRequest(Request):
         data = self._get_data_for_json(cache=cache)
 
         try:
-            rv = loads(data)
+            rv = loads(data.decode('utf-8'))
         except ValueError as e:
             if silent:
                 rv = None

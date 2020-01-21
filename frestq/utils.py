@@ -38,7 +38,8 @@ def datetime_decoder(d):
         pairs = d.items()
     result = []
     for k,v in pairs:
-        if isinstance(v, str):
+        # NOTE: change in year 2099
+        if isinstance(v, str) and v.startswith("20"):
             try:
                 v = datetime.datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
             except ValueError:
