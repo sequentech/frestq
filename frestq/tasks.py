@@ -1165,9 +1165,14 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
         # convert the asn1 cert retrieved from the socket into pem format
         try:
             cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1, r.raw.peer_cert)
-            msg.receiver_ssl_cert = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
+            msg.receiver_ssl_cert = OpenSSL.crypto\
+                .dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)\
+                .decode('utf-8')
             if update_task_receiver_ssl_cert and task:
                 task.receiver_ssl_cert = msg.receiver_ssl_cert
+                db.session.add(task)
+                db.session.commit()
+
         except Exception as e:
             pass
 
