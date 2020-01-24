@@ -9,11 +9,10 @@ Werkzeug==0.15.3
 argparse==1.2.1
 cffi==1.11.5
 ipdb==0.8
-ipython==1.2.1
+ipython==7.9.0
 itsdangerous==0.24
 prettytable==0.7.2
 pycparser==2.10
-six==1.5.2
 uwsgi==2.0.18
 cryptography==2.4.2
 pyOpenSSL==18.0.0
