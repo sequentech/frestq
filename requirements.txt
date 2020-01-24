@@ -1,5 +1,5 @@
 git+https://github.com/edulix/apscheduler#egg=apscheduler
-git+https://github.com/agoravoting/requests.git@agora#egg=requests
+requests==2.22.0
 Flask==1.0.0
 Flask-SQLAlchemy==1.0
 Jinja2==2.10.1
