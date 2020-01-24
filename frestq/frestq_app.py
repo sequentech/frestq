@@ -21,7 +21,7 @@ import argparse
 from fscheduler import FScheduler
 
 from flask import Flask
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from flask import json as json_flask
 from flask.wrappers import Request
 

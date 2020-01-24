@@ -22,7 +22,7 @@ import sqlalchemy
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, UnicodeText
 from flask import Flask, jsonify
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 
 from .app import db
 from .utils import dumps, loads
