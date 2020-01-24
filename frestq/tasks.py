@@ -1157,10 +1157,18 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     session = requests.sessions.Session()
 
     if app.config.get('SSL_CERT_PATH', ''):
-        # verification is done later
-        r = session.request('post', url, data=dumps(payload), verify=False,
-                          cert=(app.config.get('SSL_CERT_PATH', ''),
-                                app.config.get('SSL_KEY_PATH', '')))
+        # further verification is done later. for now we verify that it's in
+        # the list of allowed peers, but not which peer exactly should it be
+        r = session.request(
+            'post', 
+            url, 
+            data=dumps(payload), 
+            verify=app.config.get('SSL_CALIST_PATH', ''),
+            cert=(
+                app.config.get('SSL_CERT_PATH', ''),
+                app.config.get('SSL_KEY_PATH', '')
+            )
+        )
 
         # convert the asn1 cert retrieved from the socket into pem format
         try:
