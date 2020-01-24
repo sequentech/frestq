@@ -228,6 +228,9 @@ app = FrestqApp(__name__)
 # debug, set to false on production deployment
 DEBUG = True
 
+# see https://stackoverflow.com/questions/33738467/how-do-i-know-if-i-can-disable-sqlalchemy-track-modifications/33790196#33790196
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
 # database configuration
 # example: sqlite:////absolute/path/to/db.sqlite
 SQLALCHEMY_DATABASE_URI = ''
