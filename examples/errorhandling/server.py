@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -80,8 +80,8 @@ class HelloWorld(TaskHandler):
         ))
 
     def handle_error(self, error):
-        print "received an error, but we didn't handle it"
-        print error
+        print("received an error, but we didn't handle it")
+        print(error)
 
 @decorators.task(action="hello_recoverable_fail", queue="fail_queue")
 class HelloWorld(TaskHandler):
@@ -89,19 +89,19 @@ class HelloWorld(TaskHandler):
         raise TaskError(dict(some_data="here goes some error"))
 
     def handle_error(self, error):
-        print "handling error: ", error, "with data = ", error.data
+        print("handling error: " + error + "with data = " + error.data)
         self.task.propagate = False
 
 
 @decorators.task(action="hello_propagated_failure", queue="fail_queue")
 def hello_propagated_failure(task):
-    print "this task will fail and doesn't handle failures"
+    print("this task will fail and doesn't handle failures")
     raise TaskError(dict(some_data="here goes some error"))
 
 
 @decorators.task(action="never_land", queue="fail_queue")
 def never_land(task):
-    print "this task should never be reached"
+    print("this task should never be reached")
 
 app.configure_app(config_object=__name__)
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -15,7 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import json
 import OpenSSL
 import logging
@@ -27,7 +26,7 @@ from flask import Blueprint, request, make_response
 from .action_handlers import ActionHandlers
 from . import decorators
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
-from .utils import dumps
+from .utils import dumps, constant_time_compare
 
 def certs_differ(cert_a, cert_b):
     '''
@@ -51,12 +50,16 @@ def certs_differ(cert_a, cert_b):
 
     # now, compare the certs for real
     ca = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_a)
-    ca_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, ca)
+    ca_dump = OpenSSL.crypto\
+        .dump_certificate(OpenSSL.crypto.FILETYPE_PEM, ca)\
+        .decode('utf-8')
 
     cb = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_b)
-    cb_dump = OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cb)
+    cb_dump = OpenSSL.crypto\
+        .dump_certificate(OpenSSL.crypto.FILETYPE_PEM, cb)\
+        .decode('utf-8')
 
-    return ca_dump != cb_dump
+    return not constant_time_compare(ca_dump, cb_dump)
 
 
 class SecurityException(Exception):
@@ -86,7 +89,7 @@ def update_task(msg):
     keys = ['output_data', 'status']
     for key in keys:
         if key in msg.input_data:
-            if isinstance(msg.input_data[key], basestring):
+            if isinstance(msg.input_data[key], str):
                 logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
                     msg.input_data[key]))
             else:
@@ -174,7 +177,7 @@ def reserve_task(task_id):
                 try:
                     task_output = task.run_action_handler()
                     db.session.commit()
-                except Exception, e:
+                except Exception as e:
                     task.error = e
                     task.propagate = True
                     db.session.commit()

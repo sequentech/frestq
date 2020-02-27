@@ -1,8 +1,7 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,8 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
-import types
+from inspect import isfunction
 from functools import wraps
 from flask import request
 
@@ -31,7 +29,7 @@ def message_action(action, queue, **kwargs):
     """
     # Check if perm is given as string in order not to decorate
     # view function itself which makes debugging harder
-    if not isinstance(action, basestring) or not isinstance(queue, basestring):
+    if not isinstance(action, str) or not isinstance(queue, str):
         raise Exception("action and queue args for message decorator must be strings")
 
     def decorator(view_func):
@@ -53,7 +51,7 @@ def task(action, queue, **kwargs):
 
     # Check if perm is given as string in order not to decorate
     # view function itself which makes debugging harder
-    if not isinstance(action, basestring) or not isinstance(queue, basestring):
+    if not isinstance(action, str) or not isinstance(queue, str):
         raise Exception("action and queue args for message decorator must be strings")
 
     def decorator(view_func):
@@ -63,7 +61,7 @@ def task(action, queue, **kwargs):
         '''
         # register view_func as an action handler for the given queue
         kwargs['is_task'] = True
-        if  type(view_func) is types.ClassType:
+        if view_func is not None and not isfunction(view_func):
             view_func.action = action
             view_func.queue_name = queue
 
@@ -94,7 +92,7 @@ class local_task(DecoratorBase):
         from .protocol import certs_differ, SecurityException
         from .app import app
 
-        if  type(self.func) is types.ClassType:
+        if  not isfunction(self.func):
             task = self.func.task
         else:
             task = args[0]
@@ -112,7 +110,7 @@ def internal_task(name, **kwargs):
 
     # Check if perm is given as string in order not to decorate
     # view function itself which makes debugging harder
-    if not isinstance(name, basestring):
+    if not isinstance(name, str):
         raise Exception("name must be a string")
 
     def decorator(klass):

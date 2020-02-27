@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -14,8 +14,6 @@
 
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
-
-from __future__ import unicode_literals
 
 class ActionHandlers(object):
     _static_queue_list = dict()
@@ -70,7 +68,6 @@ class TaskHandler(object):
     task = None
 
     def __init__(self, task):
-        print
         self.task = task
 
     def execute(self):

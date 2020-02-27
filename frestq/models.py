@@ -1,8 +1,7 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,7 +15,6 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import json
 from datetime import datetime
 
@@ -24,7 +22,7 @@ import sqlalchemy
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.types import TypeDecorator, UnicodeText
 from flask import Flask, jsonify
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 
 from .app import db
 from .utils import dumps, loads
@@ -201,7 +199,7 @@ class Message(db.Model):
     task_id = db.Column(db.Unicode(128))
 
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def __repr__(self):
@@ -301,7 +299,7 @@ class Task(db.Model):
     jobs = dict()
 
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def __repr__(self):

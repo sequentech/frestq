@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -14,8 +14,6 @@
 
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
-
-from __future__ import unicode_literals
 
 import datetime
 import os
@@ -40,7 +38,8 @@ def datetime_decoder(d):
         pairs = d.items()
     result = []
     for k,v in pairs:
-        if isinstance(v, basestring):
+        # NOTE: change in year 2099
+        if isinstance(v, str) and v.startswith("20"):
             try:
                 v = datetime.datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
             except ValueError:
@@ -98,7 +97,7 @@ def list_tasks(args):
         table.add_row([str(task.id)[:8], task.sender_url, task.action,
                        task.queue_name, task.task_type, task.status,
                        task.created_date])
-    print table
+    print(table)
 
 def list_messages(args):
     '''
@@ -122,7 +121,7 @@ def list_messages(args):
     for msg in msgs:
         table.add_row([str(msg.id)[:8], msg.sender_url, msg.action, msg.queue_name,
                        msg.created_date, str(msg.input_data)[:30]])
-    print table
+    print(table)
 
 def print_task(task, base_task_id=None, level=0, mode="full"):
     '''
@@ -141,14 +140,14 @@ def print_task(task, base_task_id=None, level=0, mode="full"):
         if extra[0] == base_task_id:
             extra.append('root')
 
-        print "%(indent)s %(action)s.%(queue)s - %(task_type)s (%(extra)s)" % dict(
+        print("%(indent)s %(action)s.%(queue)s - %(task_type)s (%(extra)s)" % dict(
             indent=indent,
             action=task.action,
             queue=task.queue_name,
             task_type=task.task_type,
-            extra=", ".join(extra))
+            extra=", ".join(extra)))
     else:
-        print dumps(task.to_dict(), indent=4)
+        print(dumps(task.to_dict(), indent=4))
 
 def traverse_tasktree(task, visitor_func, visitor_kwargs):
     visitor_func(task, **visitor_kwargs)
@@ -171,11 +170,26 @@ def show_task(args):
     task_id = unicode(args.show_task)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
-        print "task %s not found" % task_id
+        print("task %s not found" % task_id)
         return
     task_model = task_model[0]
     print_task(task_model)
 
+def constant_time_compare(val1, val2):
+    """
+    Returns True if the two strings are equal, False otherwise.
+    The time taken is independent of the number of characters that match.
+    For the sake of simplicity, this function executes in constant time only
+    when the two strings have the same length. It short-circuits when they
+    have different lengths. Since Django only uses it to compare hashes of
+    known expected length, this is acceptable.
+    """
+    if len(val1) != len(val2):
+        return False
+    result = 0
+    for x, y in zip(val1, val2):
+        result |= ord(x) ^ ord(y)
+    return result == 0
 
 def show_activity(args):
     from .app import app
@@ -259,10 +273,10 @@ def show_message(args):
     msg_id = unicode(args.show_message)
     msg_model = db.session.query(Message).filter(Message.id.startswith(msg_id)).all()
     if not msg_model:
-        print "message %s not found" % msg_id
+        print("message %s not found" % msg_id)
         return
     msg_model = msg_model[0]
-    print dumps(msg_model.to_dict(), indent=4)
+    print(dumps(msg_model.to_dict(), indent=4))
 
 # drb
 def get_external_task(args):
@@ -281,17 +295,17 @@ def show_external_task(args):
     task_model = get_external_task(args)
 
     if not task_model:
-        print "task %s not found" % task_id
+        print("task %s not found" % task_id)
         return
     task_model = task_model[0]
 
     if task_model.task_type != "external":
-        print "task %s is not external" % task_id
+        print("task %s is not external" % task_id)
         return
 
     print_task(task_model, mode="oneline")
-    print "label: %s" % task_model.label
-    print "info_text:\n%s" % task_model.input_data
+    print("label: %s" % task_model.label)
+    print("info_text:\n%s" % task_model.input_data)
 
 def finish_task(args):
     from .app import db
@@ -302,18 +316,18 @@ def finish_task(args):
     try:
         finish_data = loads(unicode(args.finish[1]))
     except:
-        print "error loading the json finish data"
+        print("error loading the json finish data")
         return
 
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
 
     if not task_model:
-        print "task %s not found" % task_id
+        print("task %s not found" % task_id)
         return
     task_model = task_model[0]
 
     if task_model.task_type != "external":
-        print "task %s is not external" % task_id
+        print("task %s is not external" % task_id)
         return
 
     task = ExternalTask.instance_by_id(task_model.id)
@@ -330,7 +344,7 @@ def task_tree(args):
     task_id = unicode(args.tree)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
-        print "task %s not found" % task_id
+        print("task %s not found" % task_id)
         return
     task_model = task_model[0]
     if args.with_parents:
@@ -338,10 +352,10 @@ def task_tree(args):
             try:
                 task_model = db.session.query(Task).get(task_model.parent_id)
             except:
-                print "task %s, which is the parent of %s not found" % (
+                print("task %s, which is the parent of %s not found" % (
                     str(task.parent_id)[:8],
                     str(task.id)[:8],
-                )
+                ))
                 break
 
     level = 0

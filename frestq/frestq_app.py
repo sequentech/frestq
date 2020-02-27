@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -15,16 +15,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 
-from __future__ import unicode_literals
 import logging
 import os
 import argparse
 from fscheduler import FScheduler
 
 from flask import Flask
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from flask import json as json_flask
-from flask.wrappers import Request, _missing, _get_data
+from flask.wrappers import Request
 
 from .utils import loads
 
@@ -35,43 +34,42 @@ class FrestqRequest(Request):
     '''
 
     def get_json(self, force=False, silent=False, cache=True):
-        """Parses the incoming JSON request data and returns it.  If
-        parsing fails the :meth:`on_json_loading_failed` method on the
-        request object will be invoked.  By default this function will
-        only load the json data if the mimetype is ``application/json``
-        but this can be overriden by the `force` parameter.
-
-        :param force: if set to `True` the mimetype is ignored.
-        :param silent: if set to `False` this method will fail silently
-                       and return `False`.
-        :param cache: if set to `True` the parsed JSON data is remembered
-                      on the request.
+        """Parse and return the data as JSON. If the mimetype does not
+        indicate JSON (:mimetype:`application/json`, see
+        :meth:`is_json`), this returns ``None`` unless ``force`` is
+        true. If parsing fails, :meth:`on_json_loading_failed` is called
+        and its return value is used as the return value.
+        :param force: Ignore the mimetype and always try to parse JSON.
+        :param silent: Silence parsing errors and return ``None``
+            instead.
+        :param cache: Store the parsed JSON to return for subsequent
+            calls.
         """
-        rv = getattr(self, '_cached_json', _missing)
-        if rv is not _missing:
-            return rv
+        if cache and self._cached_json[silent] is not Ellipsis:
+            return self._cached_json[silent]
 
-        if self.mimetype != 'application/json' and not force:
+        if not (force or self.is_json):
             return None
 
-        # We accept a request charset against the specification as
-        # certain clients have been using this in the past.  This
-        # fits our general approach of being nice in what we accept
-        # and strict in what we send out.
-        request_charset = self.mimetype_params.get('charset')
+        data = self._get_data_for_json(cache=cache)
+
         try:
-            data = _get_data(self, cache)
-            if request_charset is not None:
-                rv = loads(data, encoding=request_charset)
-            else:
-                rv = loads(data)
+            rv = loads(data.decode('utf-8'))
         except ValueError as e:
             if silent:
                 rv = None
+                if cache:
+                    normal_rv, _ = self._cached_json
+                    self._cached_json = (normal_rv, rv)
             else:
                 rv = self.on_json_loading_failed(e)
-        if cache:
-            self._cached_json = rv
+                if cache:
+                    _, silent_rv = self._cached_json
+                    self._cached_json = (rv, silent_rv)
+        else:
+            if cache:
+                self._cached_json = (rv, rv)
+
         return rv
 
 class FrestqApp(Flask):
@@ -162,7 +160,7 @@ class FrestqApp(Flask):
         self.pargs = parser.parse_args()
 
         if self.pargs.limit < 1:
-            print "limit must be >= 1"
+            print("limit must be >= 1")
             return
 
         if self.pargs.log_level != None:
@@ -175,7 +173,7 @@ class FrestqApp(Flask):
 
     def run_args(self):
         if self.pargs.createdb:
-            print "creating the database: ", self.config.get('SQLALCHEMY_DATABASE_URI', '')
+            print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
             from .app import db
             db.create_all()
             return
@@ -217,10 +215,10 @@ class FrestqApp(Flask):
 
         # ignore these threaded or use_reloader, we force those two
         if 'threaded' in kwargs:
-            print "threaded provided but ignored (always set to True): ", kwargs['threaded']
+            print("threaded provided but ignored (always set to True): " + kwargs['threaded'])
             del kwargs['threaded']
         if 'use_reloader' in kwargs:
-            print "use_reloader provided but ignored (always set to True): ", kwargs['use_reloader']
+            print("use_reloader provided but ignored (always set to True): " + kwargs['use_reloader'])
             del kwargs['use_reloader']
 
         if 'port' not in kwargs:

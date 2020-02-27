@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # This file is part of frestq.
-# Copyright (C) 2013-2016  Agora Voting SL <agora@agoravoting.com>
+# Copyright (C) 2013-2020  Agora Voting SL <contact@nvotes.com>
 
 # frestq is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -48,10 +48,10 @@ class GoodbyeCruelWorldHandler(SynchronizedSubtaskHandler):
 
     def execute(self):
         username = self.task.get_data()['input_data']['username']
-        print "our reservation: ", dumps(self.task.get_reservation_data())
-        print "others reservation: ", dumps(self.task.get_data()['input_data'])
+        print("our reservation: " + dumps(self.task.get_reservation_data()))
+        print("others reservation: " + dumps(self.task.get_data()['input_data']))
 
-        print "woke up! time to finish =)\n"
+        print("woke up! time to finish =)\n")
         server_name = app.config.get('SERVER_NAME')
 
         # free the port
