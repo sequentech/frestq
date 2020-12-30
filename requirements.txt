@@ -1,4 +1,4 @@
-git+https://github.com/edulix/apscheduler#egg=apscheduler
+APScheduler @ git+https://github.com/edulix/apscheduler#egg=apscheduler
 requests==2.22.0
 Flask==1.0.0
 Flask-SQLAlchemy==2.4.1
