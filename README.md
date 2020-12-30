@@ -188,7 +188,7 @@ way:
 To launch each server, **run in different terminals** the following two commands:
 
 ```
-    $ python3 server_a.py
+    $ python server_a.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5000/
@@ -198,7 +198,7 @@ To launch each server, **run in different terminals** the following two commands
 
 
 ```
-    $ python3 server_b.py
+    $ python server_b.py
     INFO:apscheduler.threadpool:Started thread pool with 0 core threads and 20 maximum threads
     INFO:apscheduler.scheduler:Scheduler started
     INFO:werkzeug: * Running on http://127.0.0.1:5001/
