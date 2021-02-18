@@ -248,7 +248,7 @@ RESERVATION_TIMEOUT = 60
 app.config.from_object(__name__)
 
 # boostrap our little application
-db = SQLAlchemy(app)
+db = SQLAlchemy(app, engine_options={"pool_pre_ping": True})
 
 # set to True to get real security
 ALLOW_ONLY_SSL_CONNECTIONS = False
