@@ -665,7 +665,7 @@ class SequentialTask(BaseTask):
             return
 
         if next_subtask_model.status == 'error':
-            self.error = TaskError(dict(subtask_failed=next_subtask_model))
+            self.error = TaskError(dict(subtask_failed=next_subtask_model.to_dict()))
             self.propagate = True
             if self.action_handler_object:
                 try:
