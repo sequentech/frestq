@@ -23,14 +23,14 @@ from flask import Blueprint, request, make_response
 from flask import current_app
 
 from .action_handlers import ActionHandlers
-from .utils import loads
+from .utils import loads, dumps
 
 api = Blueprint('api', __name__)
 
 
 def error(status, message=""):
     if message:
-        data = json.dumps(dict(message=message))
+        data = dumps(dict(message=message))
     else:
         data=""
     return make_response(data, status)
