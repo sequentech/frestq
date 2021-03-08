@@ -20,8 +20,8 @@ import os
 from sqlalchemy import exc
 
 from apscheduler.events import *
-from apscheduler.scheduler import Scheduler
-from apscheduler.threadpool import ThreadPool
+from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
+from apscheduler.triggers.base import BaseTrigger
 from apscheduler.util import convert_to_datetime
 
 INTERNAL_SCHEDULER_NAME = "internal.frestq"
@@ -41,12 +41,12 @@ EVENT_IDS = dict(
 
 logging.basicConfig(level=logging.DEBUG)
 
-class NowTrigger(object):
+class NowTrigger(BaseTrigger):
     def __init__(self):
         pass
 
-    def get_next_fire_time(self, start_date):
-        return start_date
+    def get_next_fire_time(self, previous_fire, now):
+        return now
 
     def __str__(self):
         return 'now'
@@ -54,10 +54,6 @@ class NowTrigger(object):
     def __repr__(self):
         return '<%s>' % (self.__class__.__name__)
 
-
-class FThreadPool(ThreadPool):
-    def submit(self, func, *args, **kwargs):
-        return super(FThreadPool, self).submit(func, *args, **kwargs)
 
 class FScheduler(Scheduler):
     _schedulers = dict()
@@ -68,9 +64,6 @@ class FScheduler(Scheduler):
 
     def __init__(self, **options):
         from .app import app
-        gconfig = {
-            'apscheduler.threadpool': FThreadPool()
-        }
 
         if len(FScheduler.logger.handlers) == 0:
             root_path = app.config.get('ROOT_PATH', "")
@@ -81,7 +74,7 @@ class FScheduler(Scheduler):
             FScheduler.logger.addHandler(hdlr)
             FScheduler.logger.setLevel(logging.DEBUG)
 
-        super(FScheduler, self).__init__(gconfig, **options)
+        super(FScheduler, self).__init__(**options)
         self.add_listener(self)
 
     @staticmethod
@@ -89,11 +82,23 @@ class FScheduler(Scheduler):
         '''
         returns a scheduler for a spefic queue name
         '''
+        from .app import app
         from .utils import dumps
         if queue_name in FScheduler._schedulers:
             return FScheduler._schedulers[queue_name]
 
-        FScheduler._schedulers[queue_name] = sched = FScheduler()
+        options = {}
+        queues_opts = app.config.get('QUEUES_OPTIONS', dict())
+        opts = queues_opts.get(queue_name, dict())
+        if 'max_threads' in opts:
+            logging.info("setting scheduler for queue %s with "\
+                "max_threads = %d " %(queue_name, opts['max_threads']))
+            options['apscheduler.executors.default'] = {
+                'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
+                'max_workers': opts['max_threads'],
+            }
+
+        FScheduler._schedulers[queue_name] = sched = FScheduler(gconfig=options)
         sched.queue_name = queue_name
         FScheduler.logger.info(dumps({"action": "CREATE_QUEUE", "queue": queue_name}))
         return sched
@@ -111,22 +116,12 @@ class FScheduler(Scheduler):
         setup until this moment.
         '''
         from .utils import dumps
-        from .app import app
 
         FScheduler.logger.info(dumps({"action": "START"}))
         FScheduler.reserve_scheduler(INTERNAL_SCHEDULER_NAME)
-        queues_opts = app.config.get('QUEUES_OPTIONS', dict())
 
         for queue_name, sched in FScheduler._schedulers.items():
             logging.info("starting %s scheduler" % queue_name)
-
-            opts = queues_opts.get(queue_name, dict())
-            if 'max_threads' in opts:
-                logging.info("setting scheduler for queue %s with "\
-                    "max_threads = %d " %(queue_name, opts['max_threads']))
-                sched._threadpool.max_threads = opts['max_threads']
-                FScheduler.logger.info(dumps({"action": "SET_QUEUE_MAX", "queue": queue_name, "max": opts['max_threads']}))
-
             sched.start()
 
     def __call__(self, event):
@@ -140,13 +135,14 @@ class FScheduler(Scheduler):
 
         d = {"action": decode(event.code), "queue": self.queue_name}
 
-        if isinstance(event, JobEvent):
+        if isinstance(event, JobExecutionEvent):
             d["scheduled_run_time"] = event.scheduled_run_time
             d["retval"] = event.retval
             d["exception"] = event.exception
             d["traceback"] = event.traceback
-        elif isinstance(event, JobStoreEvent):
-            d["alias"] = event.alias
+        elif isinstance(event, JobEvent):
+            if event.code in [EVENT_JOBSTORE_ADDED, EVENT_JOBSTORE_REMOVED]:
+                d["alias"] = event.alias
 
         if hasattr(event, "job"):
             d['job_name'] = event.job.name
@@ -173,7 +169,6 @@ class FScheduler(Scheduler):
 
         logging.info("adding job in sched for queue %s" % self.queue_name)
         trigger = NowTrigger()
-        options['max_runs'] = 1
 
         # autocommit to avoid dangling sessions
         def autocommit_wrapper(*args, **kwargs2):
@@ -191,7 +186,7 @@ class FScheduler(Scheduler):
             # default to misfire_grace_time of 24 hours!
             options['misfire_grace_time'] = 3600*24
 
-        return self.add_job(trigger, autocommit_wrapper, args, kwargs,
+        return self.add_job(autocommit_wrapper, args=args, kwargs=kwargs,
                             **options)
 
     def add_date_job(self, func, date, args=None, kwargs=None, **options):
@@ -204,6 +199,7 @@ class FScheduler(Scheduler):
 
         autocommit_wrapper.__name__ = func.__name__
 
-        return super(FScheduler, self).add_date_job(autocommit_wrapper,
-                                                    date, args, kwargs,
-                                                    **options)
+        return super(FScheduler, self).add_job(autocommit_wrapper,
+                                               'date', args, kwargs,
+                                               run_date=date,
+                                               **options)
