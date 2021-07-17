@@ -14,15 +14,6 @@
 # along with frestq.  If not, see <http://www.gnu.org/licenses/>.
 from setuptools import setup
 
-from pip._internal.req import parse_requirements
-
-# parse_requirements() returns generator of pip.req.InstallRequirement objects
-install_reqs = parse_requirements("requirements.txt", session='hack')
-
-# reqs is a list of requirement
-# e.g. ['django==1.5.1', 'mezzanine==1.4.6']
-reqs = [str(ir.requirement) for ir in install_reqs]
-
 setup(
     name='frestq',
     version='20.01',
@@ -31,10 +22,31 @@ setup(
     packages=['frestq'],
     scripts=[],
     url='http://pypi.python.org/pypi/frestq/',
-    license='LICENSE.LGPL3',
+    license='LGPL-3.0',
     description='simple federated rest task queue',
     long_description=open('README.md').read(),
-    install_requires=reqs,
+    install_requires=[
+        'apscheduler==3.7.0',
+        'requests==2.22.0',
+        'Flask==1.0.0',
+        'Flask-SQLAlchemy==2.4.4',
+        'Jinja2==2.11.3',
+        'MarkupSafe==0.23',
+        'SQLAlchemy==1.3.23',
+        'Werkzeug==1.0.1',
+        'argparse==1.2.1',
+        'cffi==1.14.4',
+        'ipdb==0.13.9',
+        'ipython==7.9.0',
+        'itsdangerous==0.24',
+        'prettytable==0.7.2',
+        'pycparser==2.10',
+        'uwsgi==2.0.18',
+        'cryptography==3.3.2',
+        'pyOpenSSL==18.0.0',
+        'enum34==1.1.6',
+        'ipaddress==1.0.22'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)"
