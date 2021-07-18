@@ -1,6 +1,6 @@
 # Copyright (C) 2014-2021  Agora Voting SL <contact@nvotes.com>
 #
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: AGPL-3.0-only
 
 from setuptools import setup
 
