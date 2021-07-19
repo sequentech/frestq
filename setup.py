@@ -7,7 +7,7 @@ from setuptools import setup
 setup(
     name='frestq',
     version='20.01',
-    author='nVotes Team',
+    author='Agora Voting SL',
     author_email='contact@nvotes.com',
     packages=['frestq'],
     scripts=[],
@@ -27,7 +27,7 @@ setup(
         'argparse==1.2.1',
         'cffi==1.14.4',
         'ipdb==0.13.9',
-        'ipython==7.9.0',
+        'ipython==7.17.0',
         'itsdangerous==0.24',
         'prettytable==0.7.2',
         'pycparser==2.10',
