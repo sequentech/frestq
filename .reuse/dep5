@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: frestq
+Upstream-Contact: Eduardo Robles Elvira <edulix@nvotes.com>
+Source: https://github.com/agoravoting/frestq
+
+# Sample paragraph, commented out:
+#
+# Files: src/*
+# Copyright: $YEAR $NAME <$CONTACT>
+# License: ...

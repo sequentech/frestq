@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2014-2021 Agora Voting SL <contact@nvotes.com>
+
+SPDX-License-Identifier: AGPL-3.0-only
+-->
+
 RMQP - REST Message Queue Protocol
 ==================================
 

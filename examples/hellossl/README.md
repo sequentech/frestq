@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2013-2021 Agora Voting SL <contact@nvotes.com>
+
+SPDX-License-Identifier: AGPL-3.0-only
+-->
 sudo uwsgi --enable-threads --chown nginx:www -s server_a.sock -w server_a:app
 
 sudo uwsgi --enable-threads --chown nginx:www -s server_b.sock -w server_b:app
