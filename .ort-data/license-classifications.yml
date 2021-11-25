@@ -1,4 +1,9 @@
 ---
+# SPDX-FileCopyrightText: 2021 Agora Voting SL <contact@nvotes.com>
+# SPDX-FileCopyrightText: 2020-2021 Bosch.IO GmbH
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+#
 # Example license-classifications.yml based on categorization from
 # https://github.com/nexB/scancode-toolkit/commit/ed644e4
 #
