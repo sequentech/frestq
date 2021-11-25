@@ -21,7 +21,7 @@ resolutions:
     reason: "DYNAMIC_LINKAGE_EXCEPTION"
     comment: "This is actually a GPL-2.0 with a linking exception, allowing not to have to relicense any linking code, such as our case."
 
-  - message: "The project PIP::frestq-requirements:.* has a dependency licensed under the ScanCode copyleft categorized license GPL-2.0-or-later."
+  - message: "The project PIP::frestq-requirements:.* has the dependency PyPI::uwsgi:.* licensed under the ScanCode copyleft categorized license GPL-2.0-or-later."
     reason: "DYNAMIC_LINKAGE_EXCEPTION"
     comment: "This happens with uwsgi which is actually a GPL-2.0 with a linking exception, allowing not to have to relicense any linking code, such as our case."
     
