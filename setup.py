@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name='frestq',
-    version='4.0.0',
+    version='5.0.0',
     author='Agora Voting SL',
     author_email='contact@nvotes.com',
     packages=['frestq'],
