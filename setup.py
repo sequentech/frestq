@@ -1,4 +1,4 @@
-# Copyright (C) 2014-2021  Agora Voting SL <contact@nvotes.com>
+# Copyright (C) 2014-2021  Sequent Tech Inc <legal@sequentech.io>
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 
@@ -7,8 +7,8 @@ from setuptools import setup
 setup(
     name='frestq',
     version='4.0.0',
-    author='Agora Voting SL',
-    author_email='contact@nvotes.com',
+    author='Sequent Tech Inc',
+    author_email='legal@sequentech.io',
     packages=['frestq'],
     scripts=[],
     url='http://pypi.python.org/pypi/frestq/',

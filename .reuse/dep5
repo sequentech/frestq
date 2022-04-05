@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: frestq
-Upstream-Contact: Eduardo Robles Elvira <edulix@nvotes.com>
-Source: https://github.com/agoravoting/frestq
+Upstream-Contact: Eduardo Robles Elvira <edulix@sequentech.io>
+Source: https://github.com/sequentech/frestq
 
 # Sample paragraph, commented out:
 #
