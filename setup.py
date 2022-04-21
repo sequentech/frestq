@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name='frestq',
-    version='6.0.1',
+    version='6.0.2',
     author='Sequent Tech Inc',
     author_email='legal@sequentech.io',
     packages=['frestq'],
