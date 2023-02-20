@@ -32,8 +32,8 @@ setup(
         'prettytable==0.7.2',
         'pycparser==2.10',
         'uwsgi==2.0.18',
-        'cryptography==3.3.2',
-        'pyOpenSSL==18.0.0',
+        'cryptography==39.0.1',
+        'pyOpenSSL==23.0.0',
         'enum34==1.1.6',
         'ipaddress==1.0.22'
     ],
