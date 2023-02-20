@@ -28,7 +28,7 @@ setup(
         'cffi==1.14.4',
         'ipdb==0.13.9',
         'ipython==7.31.1',
-        'itsdangerous==0.24',
+        'itsdangerous==2.0',
         'prettytable==0.7.2',
         'pycparser==2.10',
         'uwsgi==2.0.18',
