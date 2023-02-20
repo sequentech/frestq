@@ -33,7 +33,7 @@ setup(
         'pycparser==2.10',
         'uwsgi==2.0.18',
         'cryptography==39.0.1',
-        'pyOpenSSL==18.0.0',
+        'pyOpenSSL==23.0.0',
         'enum34==1.1.6',
         'ipaddress==1.0.22'
     ],
