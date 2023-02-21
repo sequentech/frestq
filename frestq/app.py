@@ -44,7 +44,7 @@ class FrestqRequest(Request):
         if not (force or self.is_json):
             return None
 
-        data = self._get_data_for_json(cache=cache)
+        data = self.get_data(cache=cache)
 
         try:
             rv = loads(data.decode('utf-8'))
