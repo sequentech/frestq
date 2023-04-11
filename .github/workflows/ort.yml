@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2014-2022 Sequent Tech Inc <legal@sequentech.io>
+# SPDX-FileCopyrightText: 2014-2023 Sequent Tech Inc <legal@sequentech.io>
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 name: ORT licensing
@@ -17,8 +17,4 @@ on:
 
 jobs:
   ort:
-    uses: sequentech/ort-config/.github/workflows/ort.yml@main
-    with:
-      ort-cli-args: > # using the default plus the package managers setting
-        --force-overwrite
-        --stacktrace
+    uses: sequentech/meta/.github/workflows/ort.yml@main
