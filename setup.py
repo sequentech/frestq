@@ -17,8 +17,8 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         'apscheduler==3.7.0',
-        'requests==2.22.0',
-        'Flask==2.0.3',
+        'requests==2.31.0',
+        'Flask==2.3.2',
         'Flask-SQLAlchemy==2.5.1',
         'Jinja2==3.1.2',
         'MarkupSafe==2.1.1',
