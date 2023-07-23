@@ -159,6 +159,8 @@ class FrestqApp(Flask):
         if 'parse_args' in kwargs and kwargs['parse_args'] == True:
             del kwargs['parse_args']
             self.parse_args(kwargs.get('extra_parse_func', lambda a,b: None))
+            if 'extra_parse_func' in kwargs:
+                del kwargs['extra_parse_func']
             
         if self.pargs is not None:
             if self.pargs.createdb:
@@ -208,8 +210,8 @@ class FrestqApp(Flask):
         if 'port' not in kwargs:
             kwargs['port'] = app.config.get('SERVER_PORT', None)
 
-        return super(FrestqApp, self).run(threaded=True, use_reloader=False,
-                                          *args, **kwargs)
+        return super(FrestqApp, self)\
+            .run(threaded=True, use_reloader=False, *args, **kwargs)
 
 app = FrestqApp(__name__)
 
