@@ -206,6 +206,9 @@ class FrestqApp(Flask):
         if 'use_reloader' in kwargs:
             print("use_reloader provided but ignored (always set to True): " + kwargs['use_reloader'])
             del kwargs['use_reloader']
+        # ignore extra_run, we used already if needed
+        if 'extra_run' in kwargs:
+            del kwargs['extra_run']
 
         if 'port' not in kwargs:
             kwargs['port'] = app.config.get('SERVER_PORT', None)
