@@ -56,7 +56,7 @@ def loads(obj, **kwargs):
 
 # drb
 def get_tasks(args):
-    from .app import app
+    from .app import db
     from .models import Task
 
     filters=[]
@@ -65,9 +65,9 @@ def get_tasks(args):
         filters.append(getattr(Task, key).__eq__(value))
 
     if filters:
-        tasks = app.db.session.query(Task).filter(*filters)
+        tasks = db.session.query(Task).filter(*filters)
     else:
-        tasks = app.db.session.query(Task)
+        tasks = db.session.query(Task)
     tasks = tasks.order_by(Task.created_date.desc()).limit(args.limit)
 
     return tasks
@@ -93,7 +93,7 @@ def list_messages(args):
     '''
     Prints the list of messages
     '''
-    from .app import app
+    from .app import db
     from .models import Message
 
     filters=[]
@@ -102,9 +102,9 @@ def list_messages(args):
         filters.append(getattr(Message, key).__eq__(value))
 
     if filters:
-        msgs = app.db.session.query(Message).filter(*filters)
+        msgs = db.session.query(Message).filter(*filters)
     else:
-        msgs = app.db.session.query(Message)
+        msgs = db.session.query(Message)
 
     msgs = msgs.order_by(Message.created_date.desc()).limit(args.limit)
     table = PrettyTable(['small id', 'sender_url', 'action', 'queue', 'created_date', 'input_data'])
@@ -142,10 +142,10 @@ def print_task(task, base_task_id=None, level=0, mode="full"):
 def traverse_tasktree(task, visitor_func, visitor_kwargs):
     visitor_func(task, **visitor_kwargs)
 
-    from .app import app
+    from .app import db
     from .models import Task
 
-    subtasks = app.db.session.query(Task)\
+    subtasks = db.session.query(Task)\
         .with_parent(task, "subtasks")\
         .order_by(Task.order)
     for subtask in subtasks:
@@ -155,10 +155,10 @@ def traverse_tasktree(task, visitor_func, visitor_kwargs):
         traverse_tasktree(subtask, visitor_func, vargs)
 
 def show_task(args):
-    from .app import app
+    from .app import db
     from .models import Task
     task_id = unicode(args.show_task)
-    task_model = app.db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
         print("task %s not found" % task_id)
         return
@@ -258,10 +258,10 @@ def show_activity(args):
 
 
 def show_message(args):
-    from .app import app
+    from .app import db
     from .models import Message
     msg_id = unicode(args.show_message)
-    msg_model = app.db.session.query(Message).filter(Message.id.startswith(msg_id)).all()
+    msg_model = db.session.query(Message).filter(Message.id.startswith(msg_id)).all()
     if not msg_model:
         print("message %s not found" % msg_id)
         return
@@ -270,11 +270,11 @@ def show_message(args):
 
 # drb
 def get_external_task(args):
-    from .app import app
+    from .app import db
     from .models import Task
 
     task_id = unicode(args.show_external)
-    task_model = app.db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
 
     return task_model
 
@@ -298,7 +298,7 @@ def show_external_task(args):
     print("info_text:\n%s" % task_model.input_data)
 
 def finish_task(args):
-    from .app import app
+    from .app import db
     from .models import Task
     from .tasks import ExternalTask
 
@@ -309,7 +309,7 @@ def finish_task(args):
         print("error loading the json finish data")
         return
 
-    task_model = app.db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
 
     if not task_model:
         print("task %s not found" % task_id)
@@ -329,10 +329,10 @@ def deny_task(args):
     pass
 
 def task_tree(args):
-    from .app import app
+    from .app import db
     from .models import Task
     task_id = unicode(args.tree)
-    task_model = app.db.session.query(Task).filter(Task.id.startswith(task_id)).all()
+    task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
         print("task %s not found" % task_id)
         return
@@ -340,7 +340,7 @@ def task_tree(args):
     if args.with_parents:
         while task_model.parent_id:
             try:
-                task_model = app.db.session.query(Task).get(task_model.parent_id)
+                task_model = db.session.query(Task).get(task_model.parent_id)
             except:
                 print("task %s, which is the parent of %s not found" % (
                     str(task.parent_id)[:8],

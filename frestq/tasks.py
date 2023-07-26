@@ -18,7 +18,7 @@ from datetime import datetime
 
 from flask import request
 
-from .app import app
+from .app import db, app
 from .fscheduler import FScheduler, INTERNAL_SCHEDULER_NAME
 from .models import Task as ModelTask, Message as ModelMessage
 from .utils import dumps
@@ -96,8 +96,8 @@ class BaseTask(object):
 
         # update db
         self.task_model.status = "sent"
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
 
         send_message(msg_data, update_task_receiver_ssl_cert=True, task=self.task_model)
 
@@ -153,7 +153,7 @@ class BaseTask(object):
         '''
         Returns the ordered list of children of this task if any
         '''
-        subtasks = app.db.session.query(ModelTask).with_parent(self.task_model,
+        subtasks = db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").order_by(ModelTask.order)
 
         children_tasks = [self.instance_by_model(task)
@@ -164,7 +164,7 @@ class BaseTask(object):
         '''
         Gets a children by label
         '''
-        task = app.db.session.query(ModelTask).with_parent(self.task_model,
+        task = db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.label == label).first()
         if not task:
             return None
@@ -178,7 +178,7 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return None
 
-        parent = app.db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
         parent_task = self.instance_by_model(parent)
         return parent_task
 
@@ -189,7 +189,7 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return []
 
-        siblings = app.db.session.query(ModelTask)\
+        siblings = db.session.query(ModelTask)\
             .filter(ModelTask.id == self.task_model.parent_id,
                 ModelTask.id != self.task_model.id)\
             .order_by(ModelTask.order)
@@ -201,7 +201,7 @@ class BaseTask(object):
         '''
         Gets a children by label
         '''
-        task = app.db.session.query(ModelTask).filter(
+        task = db.session.query(ModelTask).filter(
             ModelTask.id == self.task_model.parent_id,
             ModelTask.id != self.task_model.id,
             ModelTask.label == label).first()
@@ -216,7 +216,7 @@ class BaseTask(object):
         if self.task_model.order == 0 or not self.task_model.parent_id:
             return None
 
-        task = app.db.session.query(ModelTask)\
+        task = db.session.query(ModelTask)\
             .filter(ModelTask.parent_id == self.task_model.parent_id,
                 ModelTask.order == self.task_model.order - 1).first()
         if not task:
@@ -230,7 +230,7 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return None
 
-        task = app.db.session.query(ModelTask)\
+        task = db.session.query(ModelTask)\
             .filter(ModelTask.parent_id == self.task_model.parent_id,
                 ModelTask.order == self.task_model.order + 1).first()
         if not task:
@@ -298,7 +298,7 @@ class BaseTask(object):
         if not self.task_model.parent_id:
             return
 
-        parent = app.db.session.query(ModelTask).get(self.task_model.parent_id)
+        parent = db.session.query(ModelTask).get(self.task_model.parent_id)
         parent_task = BaseTask.instance_by_model(parent)
         parent_task.execute()
 
@@ -393,8 +393,8 @@ class SimpleTask(BaseTask):
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
         return self.task_model
 
     def execute(self):
@@ -486,8 +486,8 @@ class ExternalTask(SimpleTask):
             'parent_id': None
         }
         self.task_model = ModelTask(**kwargs)
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
         return self.task_model
 
     def finish(self, data=None):
@@ -511,8 +511,8 @@ class ExternalTask(SimpleTask):
         '''
         if self.task_model.status in ['created', 'sent']:
             self.task_model.status = "executing"
-            app.db.session.add(self.task_model)
-            app.db.session.commit()
+            db.session.add(self.task_model)
+            db.session.commit()
         elif self.task_model.status == "finished":
             self.execute_parent()
 
@@ -561,15 +561,15 @@ class SequentialTask(BaseTask):
         model = subtask.create()
         model.order = self._count_subtasks()
         model.parent_id = self.task_model.id
-        app.db.session.add(model)
-        app.db.session.commit()
+        db.session.add(model)
+        db.session.commit()
 
     def _count_subtasks(self):
         '''
         Internal. Count the number of subtasks. Only meant to be executed after
         the sequential task has been created in the database.
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model,
+        return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").count()
 
     def create(self):
@@ -600,25 +600,25 @@ class SequentialTask(BaseTask):
         }
         self.task_model = ModelTask(**kwargs)
         # fix broken FK bug, when child added to parent that does not yet exist
-        app.db.session.add(self.task_model)
+        db.session.add(self.task_model)
         # create also subtasks
         i = 0
         for subtask in self._subtasks:
             subtask_model = subtask.create()
             subtask_model.order = i
             subtask_model.parent_id = self.task_model.id
-            app.db.session.add(subtask_model)
+            db.session.add(subtask_model)
             i += 1
         # fix broken FK bug, when child added to parent that does not yet exist
         # db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.commit()
         return self.task_model
 
     def next_subtask(self):
         '''
         Returns next subtask if any or None
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
     def execute(self):
@@ -628,8 +628,8 @@ class SequentialTask(BaseTask):
         '''
         if self.task_model.status in ['created', 'sent']:
             self.task_model.status = "executing"
-            app.db.session.add(self.task_model)
-            app.db.session.commit()
+            db.session.add(self.task_model)
+            db.session.commit()
 
         if self.task_model.status in ['finished', 'error']:
             return
@@ -641,8 +641,8 @@ class SequentialTask(BaseTask):
         # sender if it's not local
         if not next_subtask_model:
             self.task_model.status = "finished"
-            app.db.session.add(self.task_model)
-            app.db.session.commit()
+            db.session.add(self.task_model)
+            db.session.commit()
 
             # update the sender if any
             if not self.task_model.is_local:
@@ -665,8 +665,8 @@ class SequentialTask(BaseTask):
 
             if self.propagate:
                 self.task_model.status = "finished" if not self.propagate else "error"
-                app.db.session.add(self.task_model)
-                app.db.session.commit()
+                db.session.add(self.task_model)
+                db.session.commit()
 
             if not self.task_model.is_local:
                 sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
@@ -693,7 +693,7 @@ def execute_task(task_id):
     '''
     Used to execute a task asynchronously
     '''
-    task_model = app.db.session.query(ModelTask).get(task_id)
+    task_model = db.session.query(ModelTask).get(task_id)
     task = BaseTask.instance_by_model(task_model)
     task.execute()
 
@@ -732,8 +732,8 @@ class ParallelTask(BaseTask):
 
         model = subtask.create()
         model.parent_id = self.task_model.id
-        app.db.session.add(model)
-        app.db.session.commit()
+        db.session.add(model)
+        db.session.commit()
 
     def create(self):
         '''
@@ -764,38 +764,38 @@ class ParallelTask(BaseTask):
         }
         self.task_model = ModelTask(**kwargs)
         # fix broken FK bug, when child added to parent that does not yet exist
-        app.db.session.add(self.task_model)
+        db.session.add(self.task_model)
         # create also subtasks
         i = 0
         for subtask in self._subtasks:
             subtask_model = subtask.create()
             subtask_model.parent_id = self.task_model.id
-            app.db.session.add(subtask_model)
+            db.session.add(subtask_model)
             i += 1
         # fix broken FK bug, when child added to parent that does not yet exist
         # db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.commit()
         return self.task_model
 
     def count_unfinished_subtasks(self):
         '''
         Count the number of subtasks
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model,
+        return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.status != 'finished').count()
 
     def next_subtask(self):
         '''
         Returns next subtask if any or None
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
     def errored_tasks(self):
         '''
         Count the number of subtasks with error
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model,
+        return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.status == 'error')
 
     def execute(self):
@@ -809,11 +809,11 @@ class ParallelTask(BaseTask):
 
         try:
             self._db_lock.acquire()
-            app.db.session.commit()
+            db.session.commit()
 
             # paranoid mode, do not trust old tasks. check if task finished
-            app.db.session.expire(self.task_model)
-            app.db.session.refresh(self.task_model)
+            db.session.expire(self.task_model)
+            db.session.refresh(self.task_model)
             # should have been already dealt with
             if self.task_model.status == 'finished':
               return
@@ -826,8 +826,8 @@ class ParallelTask(BaseTask):
             if errored_tasks.count() > 0:
                 self.error = SubTasksFailed(errored_tasks)
                 self.task_model.status = "error"
-                app.db.session.add(self.task_model)
-                app.db.session.commit()
+                db.session.add(self.task_model)
+                db.session.commit()
                 self._db_lock.release()
 
                 # propagate
@@ -840,12 +840,12 @@ class ParallelTask(BaseTask):
             if self.task_model.status in ['created', 'sent'] and num_unfinished_subtasks > 0:
                 # mark as executing this task
                 self.task_model.status = "executing"
-                app.db.session.add(self.task_model)
-                app.db.session.commit()
+                db.session.add(self.task_model)
+                db.session.commit()
                 self._db_lock.release()
 
                 # start subtasks in parallel
-                subtasks = app.db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
+                subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
                 for subtask in subtasks:
                     sched = FScheduler.get_scheduler(subtask.queue_name)
                     sched.add_now_job(execute_task, [subtask.id])
@@ -857,8 +857,8 @@ class ParallelTask(BaseTask):
             if num_unfinished_subtasks == 0:
                 # mark as finished
                 self.task_model.status = "finished"
-                app.db.session.add(self.task_model)
-                app.db.session.commit()
+                db.session.add(self.task_model)
+                db.session.commit()
                 self._db_lock.release()
 
                 # check if there's a parent task, and if so execute() it
@@ -895,8 +895,8 @@ def send_synchronization_message(task_id):
     }
     send_message(msg)
     task.last_modified_date = datetime.utcnow()
-    app.db.session.add(task)
-    app.db.session.commit()
+    db.session.add(task)
+    db.session.commit()
 
 
 
@@ -949,8 +949,8 @@ class SynchronizedTask(BaseTask):
 
         model = subtask.create()
         model.parent_id = self.task_model.id
-        app.db.session.add(model)
-        app.db.session.commit()
+        db.session.add(model)
+        db.session.commit()
 
     def create(self):
         '''
@@ -991,31 +991,31 @@ class SynchronizedTask(BaseTask):
         for subtask in self._subtasks:
             subtask_model = subtask.create()
             subtask_model.parent_id = self.task_model.id
-            app.db.session.add(subtask_model)
+            db.session.add(subtask_model)
             i += 1
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
         return self.task_model
 
     def count_unfinished_subtasks(self):
         '''
         Count the number of subtasks
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model,
+        return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.status != 'finished').count()
 
     def next_subtask(self):
         '''
         Returns next subtask if any or None
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
+        return db.session.query(ModelTask).with_parent(self.task_model, "subtasks").\
             filter(ModelTask.status != 'finished').order_by(ModelTask.order).first()
 
     def errored_tasks(self):
         '''
         Count the number of subtasks with error
         '''
-        return app.db.session.query(ModelTask).with_parent(self.task_model,
+        return db.session.query(ModelTask).with_parent(self.task_model,
             "subtasks").filter(ModelTask.status == 'error')
 
     def execute(self):
@@ -1028,11 +1028,11 @@ class SynchronizedTask(BaseTask):
 
         try:
             self._db_lock.acquire()
-            app.db.session.commit()
+            db.session.commit()
 
             # paranoid mode, do not trust old tasks. check if task finished
-            app.db.session.expire(self.task_model)
-            app.db.session.refresh(self.task_model)
+            db.session.expire(self.task_model)
+            db.session.refresh(self.task_model)
             # should have been already dealt with
             if self.task_model.status == 'finished':
               return
@@ -1046,8 +1046,8 @@ class SynchronizedTask(BaseTask):
             if errored_tasks.count() > 0:
                 self.error = SubTasksFailed(errored_tasks)
                 self.task_model.status = "error"
-                app.db.session.add(self.task_model)
-                app.db.session.commit()
+                db.session.add(self.task_model)
+                db.session.commit()
                 self._db_lock.release()
 
                 # propagate
@@ -1073,12 +1073,12 @@ class SynchronizedTask(BaseTask):
     def _synchronize(self):
         # mark as executing this task
         self.task_model.status = "executing"
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
         self._db_lock.release()
 
         # send initial synchronization message to subtasks
-        subtasks = app.db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
+        subtasks = db.session.query(ModelTask).with_parent(self.task_model, "subtasks")
         for subtask in subtasks:
             sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
             sched.add_now_job(send_synchronization_message, [subtask.id])
@@ -1089,8 +1089,8 @@ class SynchronizedTask(BaseTask):
         '''
         # mark as finished
         self.task_model.status = "finished"
-        app.db.session.add(self.task_model)
-        app.db.session.commit()
+        db.session.add(self.task_model)
+        db.session.commit()
         self._db_lock.release()
 
         # check if there's a parent task, and if so execute() it
@@ -1141,8 +1141,8 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     # msg is saved before sending the message so that it's registered (it might
     # get even be retrieved from DB by api.py:post_message() if it's a local
     # message, but it's also updated when the msg is sent to update output
-    app.db.session.add(msg)
-    app.db.session.commit()
+    db.session.add(msg)
+    db.session.commit()
 
     session = requests.sessions.Session()
 
@@ -1168,8 +1168,8 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
                 .decode('utf-8')
             if update_task_receiver_ssl_cert and task:
                 task.receiver_ssl_cert = msg.receiver_ssl_cert
-                app.db.session.add(task)
-                app.db.session.commit()
+                db.session.add(task)
+                db.session.commit()
 
         except Exception as e:
             pass
@@ -1183,8 +1183,8 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     if r.status_code >= 400:
         print("!!! ERROR request to url = '%s' and status = '%d' answered:\n%s" % (url, r.status_code, r.text))
 
-    app.db.session.add(msg)
-    app.db.session.commit()
+    db.session.add(msg)
+    db.session.commit()
 
 
 class TaskError(Exception):
@@ -1231,12 +1231,12 @@ def send_task_update(task_id):
     logging.debug("update_msg.inputdata: %s" % dumps(update_msg["input_data"]))
     send_message(update_msg)
     task.last_modified_date = datetime.utcnow()
-    app.db.session.add(task)
-    app.db.session.commit()
+    db.session.add(task)
+    db.session.commit()
 
     # task finished. check if there's a parent task, and if so execute() it
     if task.parent_id:
-        parent = app.db.session.query(ModelTask).get(task.parent_id)
+        parent = db.session.query(ModelTask).get(task.parent_id)
         parent_task = BaseTask.instance_by_model(parent)
         parent_task.execute()
 
@@ -1258,8 +1258,8 @@ def update_task(task, task_output):
         task.task_model.output_data = task_output['output_status']
 
     if commit:
-        app.db.session.add(task.task_model)
-        app.db.session.commit()
+        db.session.add(task.task_model)
+        db.session.commit()
 
 def post_task(msg, action_handler):
     '''
@@ -1290,35 +1290,35 @@ def post_task(msg, action_handler):
 
     if not kwargs['id']:
         msg.task_id = kwargs['id'] = str(uuid4())
-        app.db.session.add(msg)
-        app.db.session.commit()
+        db.session.add(msg)
+        db.session.commit()
 
 
     # if msg originated from ourselves, it might already exist. or if it's a
     # subtask of a synchronized task
-    task_model = app.db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task_model = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     if task_model:
         if task_model.task_type == 'simple':
             # this could happen if the task was created with SimpleTask
             task_model.task_type = 'sequential'
-            app.db.session.add(task_model)
-            app.db.session.commit()
+            db.session.add(task_model)
+            db.session.commit()
     else:
         task_model = ModelTask(**kwargs)
-        app.db.session.add(task_model)
-        app.db.session.commit()
+        db.session.add(task_model)
+        db.session.commit()
 
     # 2. call to the handler
     task = BaseTask.instance_by_model(task_model)
     task_output = None
     try:
         task_output = task.run_action_handler()
-        app.db.session.commit()
+        db.session.commit()
     except Exception as e:
         import traceback; traceback.print_exc()
         task.error = e
         task.propagate = True
-        app.db.session.commit()
+        db.session.commit()
         if task.action_handler_object:
             try:
                 task.action_handler_object.handle_error(e)
@@ -1332,8 +1332,8 @@ def post_task(msg, action_handler):
     # 3. update asynchronously the task sender if requested
     if task.auto_finish_after_handler or task.propagate:
         task_model.status = "finished" if not task.propagate else "error"
-        app.db.session.add(task_model)
-        app.db.session.commit()
+        db.session.add(task_model)
+        db.session.commit()
 
     if task.send_update_to_sender:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
