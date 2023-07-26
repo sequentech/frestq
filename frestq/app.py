@@ -166,7 +166,7 @@ class FrestqApp(Flask):
             if self.pargs.createdb:
                 print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
                 self.init_db()
-                db.create_all()
+                db.create_all(app=self)
                 return
             elif self.pargs.messages:
                 list_messages(self.pargs)
