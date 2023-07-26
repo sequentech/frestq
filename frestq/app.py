@@ -68,6 +68,7 @@ class FrestqRequest(Request):
 
         return rv
 
+
 class FrestqApp(Flask):
     def __init__(self, *args, **kwargs):
         super(FrestqApp, self).__init__(*args, **kwargs)
@@ -224,7 +225,6 @@ class FrestqApp(Flask):
         return super(FrestqApp, self)\
             .run(threaded=True, use_reloader=False, *args, **kwargs)
 
-app = FrestqApp(__name__)
 
 ### configuration
 
@@ -263,6 +263,10 @@ class DefaultConfig(object):
     # settings, and even custom queue settings that can be used by you later.
 
     QUEUES_OPTIONS = dict()
+
+
+app = FrestqApp(__name__)
+app.config.from_object(DefaultConfig())
 
 from . import models
 
