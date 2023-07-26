@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2023 Sequent Tech Inc <legal@sequentech.io>
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[tool.poetry]
+name = "frestq"
+version = "4.0.0"
+description = ""
+authors = ["Eduardo Robles <edu@sequentech.io>"]
+license = "AGPL-3.0-only"
+readme = "README.md"
+packages = [{include = "frestq"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+apscheduler = "3.7.0"
+requests = "^2.31.0"
+Flask = "^2.3.2"
+flask-sqlalchemy = "^3.0.5"
+cryptography = "^41.0.2"
+pyOpenSSL = "23.2.0"
+enum34 = "^1.1.6"
+ipaddress = "^1.0.22"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
