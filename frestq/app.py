@@ -78,7 +78,7 @@ class FrestqApp(Flask):
     pargs = None
 
     def init_db(self):
-        logging.info("initializing app.db instance..")
+        logging.info("initializing db instance..")
         db.init_app(self)
 
     def configure_app(self, scheduler=True, config_object=None):
@@ -165,7 +165,7 @@ class FrestqApp(Flask):
         if self.pargs is not None:
             if self.pargs.createdb:
                 print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
-                app.db.create_all()
+                db.create_all()
                 return
             elif self.pargs.messages:
                 list_messages(self.pargs)
