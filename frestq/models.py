@@ -14,7 +14,7 @@ from sqlalchemy.types import TypeDecorator, UnicodeText
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
-from .app import db
+from .app import app
 from .utils import dumps, loads
 
 
@@ -148,45 +148,45 @@ class MutationList(MutationObj, list):
 
 MutationObj.associate_with(JSONEncodedDict)
 
-class Message(db.Model):
+class Message(app.db.Model):
     '''
     Represents an election
     '''
     __tablename__ = 'message'
 
-    id = db.Column(db.Unicode(128), primary_key=True)
+    id = app.db.Column(app.db.Unicode(128), primary_key=True)
 
-    sender_url = db.Column(db.Unicode(1024))
+    sender_url = app.db.Column(app.db.Unicode(1024))
 
-    queue_name = db.Column(db.Unicode(1024))
+    queue_name = app.db.Column(app.db.Unicode(1024))
 
-    is_received = db.Column(db.Boolean)
+    is_received = app.db.Column(app.db.Boolean)
 
-    receiver_url = db.Column(db.Unicode(1024))
+    receiver_url = app.db.Column(app.db.Unicode(1024))
 
-    sender_ssl_cert = db.Column(db.UnicodeText)
+    sender_ssl_cert = app.db.Column(app.db.UnicodeText)
 
-    receiver_ssl_cert = db.Column(db.UnicodeText)
+    receiver_ssl_cert = app.db.Column(app.db.UnicodeText)
 
-    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_date = app.db.Column(app.db.DateTime, default=datetime.utcnow)
 
-    action = db.Column(db.Unicode(1024))
+    action = app.db.Column(app.db.Unicode(1024))
 
-    input_data = db.Column(JSONEncodedDict)
+    input_data = app.db.Column(JSONEncodedDict)
 
-    output_status = db.Column(db.Integer)
+    output_status = app.db.Column(app.db.Integer)
 
-    pingback_date = db.Column(db.DateTime, default=None)
+    pingback_date = app.db.Column(app.db.DateTime, default=None)
 
-    expiration_date = db.Column(db.DateTime, default=None)
+    expiration_date = app.db.Column(app.db.DateTime, default=None)
 
-    info_text = db.Column(db.Unicode(2048))
+    info_text = app.db.Column(app.db.Unicode(2048))
 
     # fixed broken FK bug, when taskid exists in a non local db
     # task_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
     #task = db.relationship('Task',
     #    backref=db.backref('messages', lazy='dynamic'))
-    task_id = db.Column(db.Unicode(128))
+    task_id = app.db.Column(app.db.Unicode(128))
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -224,65 +224,65 @@ class Message(db.Model):
         return ret
 
 
-class Task(db.Model):
+class Task(app.db.Model):
     '''
     Represents a task
     '''
     __tablename__ = 'task'
 
-    id = db.Column(db.Unicode(128), primary_key=True)
+    id = app.db.Column(app.db.Unicode(128), primary_key=True)
 
     # this can be "simple", "sequential", "parallel", "external" or
     # "synchronized"
-    task_type = db.Column(db.Unicode(1024))
+    task_type = app.db.Column(app.db.Unicode(1024))
 
     # for example used in synchronous tasks to store the algorithm
-    task_metadata = db.Column(JSONEncodedDict)
+    task_metadata = app.db.Column(JSONEncodedDict)
 
-    label = db.Column(db.Unicode(1024))
+    label = app.db.Column(app.db.Unicode(1024))
 
-    action = db.Column(db.Unicode(1024))
+    action = app.db.Column(app.db.Unicode(1024))
 
-    queue_name = db.Column(db.Unicode(1024))
+    queue_name = app.db.Column(app.db.Unicode(1024))
 
-    status = db.Column(db.Unicode(1024))
+    status = app.db.Column(app.db.Unicode(1024))
 
-    is_received = db.Column(db.Boolean)
+    is_received = app.db.Column(app.db.Boolean)
 
-    is_local = db.Column(db.Boolean, default=False)
+    is_local = app.db.Column(app.db.Boolean, default=False)
 
-    parent_id = db.Column(db.Unicode(128), db.ForeignKey('task.id'))
+    parent_id = app.db.Column(app.db.Unicode(128), app.db.ForeignKey('task.id'))
 
-    subtasks = db.relationship("Task", lazy="joined", join_depth=1)
+    subtasks = app.db.relationship("Task", lazy="joined", join_depth=1)
 
     # used if it's a subtask
-    order = db.Column(db.Integer)
+    order = app.db.Column(app.db.Integer)
 
-    receiver_url = db.Column(db.Unicode(1024))
+    receiver_url = app.db.Column(app.db.Unicode(1024))
 
-    sender_url = db.Column(db.Unicode(1024))
+    sender_url = app.db.Column(app.db.Unicode(1024))
 
-    sender_ssl_cert = db.Column(db.UnicodeText)
+    sender_ssl_cert = app.db.Column(app.db.UnicodeText)
 
-    receiver_ssl_cert = db.Column(db.UnicodeText)
+    receiver_ssl_cert = app.db.Column(app.db.UnicodeText)
 
-    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    created_date = app.db.Column(app.db.DateTime, default=datetime.utcnow)
 
-    last_modified_date = db.Column(db.DateTime, default=datetime.utcnow)
+    last_modified_date = app.db.Column(app.db.DateTime, default=datetime.utcnow)
 
-    input_data = db.Column(JSONEncodedDict)
+    input_data = app.db.Column(JSONEncodedDict)
 
-    output_data = db.Column(JSONEncodedDict)
+    output_data = app.db.Column(JSONEncodedDict)
 
-    reservation_data = db.Column(JSONEncodedDict)
+    reservation_data = app.db.Column(JSONEncodedDict)
 
-    pingback_date = db.Column(db.DateTime, default=None)
+    pingback_date = app.db.Column(app.db.DateTime, default=None)
 
-    pingback_pending = db.Column(db.Boolean, default=False)
+    pingback_pending = app.db.Column(app.db.Boolean, default=False)
 
-    expiration_date = db.Column(db.DateTime, default=None)
+    expiration_date = app.db.Column(app.db.DateTime, default=None)
 
-    expiration_pending = db.Column(db.Boolean, default=False)
+    expiration_pending = app.db.Column(app.db.Boolean, default=False)
 
     # used to store scheduled jobs and remove them when they have finished
     # or need to be removed
@@ -296,7 +296,7 @@ class Task(db.Model):
         return '<Task %r>' % self.action
 
     def get_parent(self):
-        return db.session.query(Task).get(self.parent_id)
+        return app.db.session.query(Task).get(self.parent_id)
 
     def to_dict(self, full=False):
         '''
@@ -327,7 +327,7 @@ class Task(db.Model):
         }
 
         if full:
-            parent = db.session.query(Task).get(self.parent_id)
+            parent = app.db.session.query(Task).get(self.parent_id)
             ret['parent'] = parent.to_dict()
         else:
             ret['parent_id'] = self.parent_id

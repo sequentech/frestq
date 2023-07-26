@@ -155,7 +155,7 @@ class FScheduler(Scheduler):
         :type date: :class:`datetime.date`
         :rtype: :class:`~apscheduler.job.Job`
         """
-        from .app import db
+        from .app import app
 
         logging.info("adding job in sched for queue %s" % self.queue_name)
         trigger = NowTrigger()
@@ -164,11 +164,11 @@ class FScheduler(Scheduler):
         def autocommit_wrapper(*args, **kwargs2):
             try:
               func(*args, **kwargs2)
-              db.session.commit()
+              app.db.session.commit()
             except exc.SQLAlchemyError:
               import traceback; traceback.print_exc()
               logging.info("SQLAlchemy exception, doing a rollback for recovery.")
-              db.session.rollback()
+              app.db.session.rollback()
 
         autocommit_wrapper.__name__ = func.__name__
 
@@ -180,12 +180,12 @@ class FScheduler(Scheduler):
                             **options)
 
     def add_date_job(self, func, date, args=None, kwargs=None, **options):
-        from .app import db
+        from .app import app
 
         # autocommit to avoid dangling sessions
         def autocommit_wrapper(*args, **kwargs2):
             func(*args, **kwargs2)
-            db.session.commit()
+            app.db.session.commit()
 
         autocommit_wrapper.__name__ = func.__name__
 

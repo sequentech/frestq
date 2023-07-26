@@ -53,7 +53,7 @@ def post_message(queue_name):
     '''
     # 1. register message in the db model
 
-    from .app import db
+    from .app import app
     from .models import Message
 
     logging.debug('RECEIVED MESSAGE in queue %s' % queue_name)
@@ -110,8 +110,8 @@ def post_message(queue_name):
                 'output_status': 200
         }
         msg = Message(**kwargs)
-        db.session.add(msg)
-        db.session.commit()
+        app.db.session.add(msg)
+        app.db.session.commit()
 
     action_handler = ActionHandlers.get_action_handler(msg.action, queue_name)
     if not action_handler:

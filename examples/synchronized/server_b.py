@@ -9,7 +9,6 @@
 import copy
 
 from frestq import decorators
-from frestq.app import db
 from frestq.app import app
 from frestq.tasks import SimpleTask, ParallelTask, SynchronizedTask
 from frestq.action_handlers import SynchronizedTaskHandler
@@ -52,15 +51,15 @@ class SynchronizedGoodbyeHandler(SynchronizedTaskHandler):
             self.task.task_model.reservation_data = dict()
 
         self.task.task_model.reservation_data[subtask_id] = reservation_data
-        db.session.add(self.task.task_model)
-        db.session.commit()
+        app.db.session.add(self.task.task_model)
+        app.db.session.commit()
 
     def pre_execute(self):
         reservation_data = self.task.get_data()["reservation_data"]
         for subtask in self.task.get_children():
             subtask.task_model.input_data["reservation_data"] = reservation_data
-            db.session.add(subtask.task_model)
-        db.session.commit()
+            app.db.session.add(subtask.task_model)
+        app.db.session.commit()
 
 @decorators.task(action="testing.hello_world", queue="hello_world")
 def hello_world(task):
@@ -156,8 +155,8 @@ def all_goodbyes_together(task):
     ]
     parent_model = task.get_parent().task_model
     task.get_parent().task_model.output_data = output_data
-    db.session.add(parent_model)
-    db.session.commit()
+    app.db.session.add(parent_model)
+    app.db.session.commit()
 
     return dict(
         output_data = output_data

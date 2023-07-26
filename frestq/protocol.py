@@ -57,13 +57,13 @@ class SecurityException(Exception):
 
 @decorators.message_action(action="frestq.update_task", queue=INTERNAL_SCHEDULER_NAME)
 def update_task(msg):
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import BaseTask
 
     # fixed broken FK bug, when taskid exists in a non local db
     # task = msg.task
-    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
 
     logging.debug("UPDATING TASK with id %s" % task.id)
     if not task or\
@@ -87,8 +87,8 @@ def update_task(msg):
                     dumps(msg.input_data[key])))
             setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
 
     # do next (it might be a task with a parent task)
     receiver_task = BaseTask.instance_by_model(task)
@@ -103,12 +103,12 @@ def reserve_task(task_id):
     task from the receiver's point of view. When synced, this also executes the
     task.
     '''
-    from .app import db, app
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import BaseTask, send_task_update
 
     # 1. get task and check everything is ok
-    task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     if not task or task.status != 'syncing':
         # probably means we timedout or maybe there was some kind of error, so
         # we finish here
@@ -123,8 +123,8 @@ def reserve_task(task_id):
     # 3. send reserved message to sender
     task.status = 'reserved'
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
     ack_reservation(task_id)
 
     # 4. set reservation timeout
@@ -137,8 +137,8 @@ def reserve_task(task_id):
         while True:
             _reserve_condition.wait()
             # fetch again the task to get the newly obtained status info
-            db.session.commit()
-            task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
+            app.db.session.commit()
+            task = app.db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
 
             # we probably received a _reserve_condition that was sent to another thread
             # because our task didn't change state, so we ignore the signal
@@ -159,18 +159,18 @@ def reserve_task(task_id):
                 task_model = task
                 task_model.status = 'executing'
                 task_model.last_modified_date = datetime.utcnow()
-                db.session.add(task_model)
-                db.session.commit()
+                app.db.session.add(task_model)
+                app.db.session.commit()
 
                 task = BaseTask.instance_by_model(task_model)
                 task_output = None
                 try:
                     task_output = task.run_action_handler()
-                    db.session.commit()
+                    app.db.session.commit()
                 except Exception as e:
                     task.error = e
                     task.propagate = True
-                    db.session.commit()
+                    app.db.session.commit()
                     import traceback; traceback.print_exc()
                     if task.action_handler_object:
                         task.action_handler_object.handle_error(e)
@@ -182,13 +182,13 @@ def reserve_task(task_id):
                 if task.propagate:
                     task_model.status = "error"
                     task_model.last_modified_date = datetime.utcnow()
-                    db.session.add(task_model)
-                    db.session.commit()
+                    app.db.session.add(task_model)
+                    app.db.session.commit()
                 elif task.auto_finish_after_handler:
                     task_model.status = "finished"
                     task_model.last_modified_date = datetime.utcnow()
-                    db.session.add(task_model)
-                    db.session.commit()
+                    app.db.session.add(task_model)
+                    app.db.session.commit()
 
                 if task.send_update_to_sender or task.propagate:
                     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
@@ -211,11 +211,11 @@ def cancel_reserved_subtask(task_id):
     Note: this task is executed in cases where the task can be either local and
     not local.
     '''
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import BaseTask
 
-    task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
 
     task_instance = BaseTask.instance_by_model(task)
     # task action_handler_object might not be present, it's not mandatory, and
@@ -229,8 +229,8 @@ def cancel_reserved_subtask(task_id):
 
     task.status = "created"
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
     with _reserve_condition:
         _reserve_condition.notify_all()
 
@@ -238,11 +238,11 @@ def ack_reservation(task_id):
     '''
     Sends a confirmation of a task reservation to task sender
     '''
-    from .app import db, app
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import send_message
 
-    task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     if not task or task.status != 'reserved':
         return
 
@@ -270,11 +270,11 @@ def synchronize_task(msg):
     Receives a task that needs to be synchronized because its parent is a
     SynchronizedTask
     '''
-    from .app import db, app
+    from .app import app
     from .models import Task as ModelTask
 
     logging.debug("SYNCING TASK with id %s" % msg.task_id)
-    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     if task and task.status != 'created':
         # error, cannot update an already finished task (unless it's an error)!
         # TODO: send back an error update
@@ -300,8 +300,8 @@ def synchronize_task(msg):
             'task_type': 'sequential'
         }
         task = ModelTask(**kwargs)
-        db.session.add(task)
-        db.session.commit()
+        app.db.session.add(task)
+        app.db.session.commit()
     else:
         if certs_differ(task.sender_ssl_cert, msg.sender_ssl_cert):
             raise  SecurityException()
@@ -311,8 +311,8 @@ def synchronize_task(msg):
 
         task.status = 'syncing'
         task.last_modified_date = datetime.utcnow()
-        db.session.add(task)
-        db.session.commit()
+        app.db.session.add(task)
+        app.db.session.commit()
 
     sched = FScheduler.get_scheduler(task.queue_name)
     sched.add_now_job(reserve_task, [task.id])
@@ -329,11 +329,11 @@ def director_confirm_task_reservation(msg):
     '''
     Director of a synchronized task receives a task reservation
     '''
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import BaseTask, send_synchronization_message
 
-    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     task_instance = BaseTask.instance_by_model(task)
     parent_instance = task_instance.get_parent()
 
@@ -351,8 +351,8 @@ def director_confirm_task_reservation(msg):
     task.status = 'reserved'
     task.reservation_data = msg.input_data.get('reservation_data', None)
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
 
     logging.debug("CONFIRMED TASK RESERVATION with id %s" % msg.task_id)
 
@@ -390,11 +390,11 @@ def director_cancel_reserved_subtask(task_id):
     '''
     Cancel a task because a reservation timeout in the director node
     '''
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import BaseTask, send_synchronization_message
 
-    task = db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
+    task = app.db.session.query(ModelTask).filter(ModelTask.id == task_id).first()
     task_instance = BaseTask.instance_by_model(task)
     parent_instance = task_instance.get_parent()
 
@@ -407,8 +407,8 @@ def director_cancel_reserved_subtask(task_id):
 
     task.status = "created"
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
 
     #if all tasks are created, it means all tasks have expired, so we cannot
     #wait for a confirmation that will launch again all the expired tasks.
@@ -427,7 +427,7 @@ def director_synchronized_subtask_start(task_id):
     '''
     Launch the execution of a subtask
     '''
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .tasks import send_message
 
@@ -456,7 +456,7 @@ def director_synchronized_subtask_start(task_id):
 @decorators.message_action(action="frestq.execute_synchronized", queue=INTERNAL_SCHEDULER_NAME)
 def execute_synchronized(msg):
 
-    from .app import db
+    from .app import app
     from .models import Task as ModelTask
     from .api import call_action_handler
     from .fscheduler import FScheduler
@@ -475,8 +475,8 @@ def execute_synchronized(msg):
     task.input_data = msg.input_data['input_data']
     task.status = "confirmed"
     task.last_modified_date = datetime.utcnow()
-    db.session.add(task)
-    db.session.commit()
+    app.db.session.add(task)
+    app.db.session.commit()
     with _reserve_condition:
         _reserve_condition.notify_all()
 
@@ -486,14 +486,14 @@ def finish_external_task(msg):
     '''
     marks as finished an external task. This will let the task flow continue
     '''
-    from .app import db, app
+    from .app import app
     from .models import Task as ModelTask
     from .api import call_action_handler
     from .fscheduler import FScheduler
     from .tasks import BaseTask, post_task, send_task_update
 
     # get the task model
-    task_model = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task_model = app.db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
     if not task_model or task_model.task_type != "external" or\
         task_model.status != 'executing' or\
         task_model.sender_url != app.config.get('ROOT_URL'):
@@ -507,8 +507,8 @@ def finish_external_task(msg):
     task = BaseTask.instance_by_model(task_model)
     task_model.output_data = msg.input_data
     task_model.status = "finished"
-    db.session.add(task_model)
-    db.session.commit()
+    app.db.session.add(task_model)
+    app.db.session.commit()
 
     if task.send_update_to_sender:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
