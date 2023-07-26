@@ -87,34 +87,25 @@ class FrestqApp(Flask):
         run the application except calling app.run, so that it can be reused
         when using gunicorn or similar.
         '''
-        self.config.from_object(DefaultConfig())
         if config_object:
             self.config.from_object(config_object)
 
-        frestq_settings = os.environ.get('FRESTQ_SETTINGS', None)
-        if frestq_settings is not None:
-            if not os.path.isabs(frestq_settings):
-                os.environ['FRESTQ_SETTINGS'] = os.path.abspath(frestq_settings)
-            logging.debug("FRESTQ_SETTINGS = %s" % os.environ['FRESTQ_SETTINGS'])
-            self.config.from_envvar('FRESTQ_SETTINGS', silent=False)
-        else:
-            logging.warning("FRESTQ_SETTINGS not set")
-
         # store cert in
-        if self.config.get('SSL_CERT_PATH', None) and\
-            self.config.get('SSL_KEY_PATH', None):
-
+        if (
+            self.config.get('SSL_CERT_PATH', None) and
+            self.config.get('SSL_KEY_PATH', None)
+        ):
             with open(self.config.get('SSL_CERT_PATH', ''), 'r') as f:
                 self.config['SSL_CERT_STRING'] = f.read()
         else:
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
 
+        self.init_db()
         if not scheduler:
             return
 
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
-        self.init_db()
         FScheduler.start_all_schedulers()
      
     def parse_args(self, extra_parse_func):
