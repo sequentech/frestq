@@ -20,6 +20,9 @@ from .utils import loads
 
 logging.basicConfig(level=logging.DEBUG)
 
+# boostrap our little application
+db = SQLAlchemy(engine_options={"pool_pre_ping": True})
+
 class FrestqRequest(Request):
     '''
     We have to customize request so that by default it can overload the json
@@ -73,13 +76,17 @@ class FrestqApp(Flask):
 
     pargs = None
 
+    def init_db(self):
+        logging.info("initializing app.db instance..")
+        db.init_app(self)
+
     def configure_app(self, scheduler=True, config_object=None):
         '''
         Configures the application. It's intended to do everything to be able to
-        run the application except calling app.run, so that it can be reused when
-        using gunicorn or similar.
+        run the application except calling app.run, so that it can be reused
+        when using gunicorn or similar.
         '''
-        self.config.from_object(__name__)
+        self.config.from_object(DefaultConfig())
         if config_object:
             self.config.from_object(config_object)
 
@@ -106,6 +113,7 @@ class FrestqApp(Flask):
             return
 
         logging.info("Launching with ROOT_URL = %s", self.config['ROOT_URL'])
+        self.init_db()
         FScheduler.start_all_schedulers()
      
     def parse_args(self, extra_parse_func):
@@ -165,7 +173,7 @@ class FrestqApp(Flask):
         if self.pargs is not None:
             if self.pargs.createdb:
                 print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
-                db.create_all()
+                app.db.create_all()
                 return
             elif self.pargs.messages:
                 list_messages(self.pargs)
@@ -220,45 +228,41 @@ app = FrestqApp(__name__)
 
 ### configuration
 
-# debug, set to false on production deployment
-DEBUG = True
+class DefaultConfig(object):
+    # debug, set to false on production deployment
+    DEBUG = True
 
-# see https://stackoverflow.com/questions/33738467/how-do-i-know-if-i-can-disable-sqlalchemy-track-modifications/33790196#33790196
-SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # see https://stackoverflow.com/questions/33738467/how-do-i-know-if-i-can-disable-sqlalchemy-track-modifications/33790196#33790196
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-# database configuration
-# example: sqlite:////absolute/path/to/db.sqlite
-SQLALCHEMY_DATABASE_URI = ''
+    # database configuration
+    # example: sqlite:////absolute/path/to/db.sqlite
+    SQLALCHEMY_DATABASE_URI = ''
 
-# own certificate, None if there isn't any
-SSL_CERT_PATH = None
-SSL_KEY_PATH = None
+    # own certificate, None if there isn't any
+    SSL_CERT_PATH = None
+    SSL_KEY_PATH = None
 
-# queues root url
-ROOT_URL = 'http://127.0.0.1:5000/api/queues'
+    # queues root url
+    ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
-# time a thread can be reserved in for synchronization purposes. In seconds.
-RESERVATION_TIMEOUT = 60
+    # time a thread can be reserved in for synchronization purposes. In seconds.
+    RESERVATION_TIMEOUT = 60
 
-app.config.from_object(__name__)
+    # set to True to get real security
+    ALLOW_ONLY_SSL_CONNECTIONS = False
 
-# boostrap our little application
-db = SQLAlchemy(app, engine_options={"pool_pre_ping": True})
-
-# set to True to get real security
-ALLOW_ONLY_SSL_CONNECTIONS = False
-
-# options for each queue. example:
-#QUEUES_OPTIONS = {
-    #'mycustom_queue': {
-        #'max_threads': 3,
+    # options for each queue. example:
+    #QUEUES_OPTIONS = {
+        #'mycustom_queue': {
+            #'max_threads': 3,
+        #}
     #}
-#}
-# thread data mapper is a function that would be called when a Synchronous task
-# in this queue is going to be executed. It allows to set queue-specific
-# settings, and even custom queue settings that can be used by you later.
+    # thread data mapper is a function that would be called when a Synchronous task
+    # in this queue is going to be executed. It allows to set queue-specific
+    # settings, and even custom queue settings that can be used by you later.
 
-QUEUES_OPTIONS = dict()
+    QUEUES_OPTIONS = dict()
 
 from . import models
 

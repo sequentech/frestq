@@ -15,11 +15,12 @@ python = "^3.8"
 apscheduler = "3.7.0"
 requests = "^2.31"
 Flask = "^2.3"
-flask-sqlalchemy = "^3.0"
+flask-sqlalchemy = "^2.5"
 cryptography = "^41.0"
 pyOpenSSL = "23.2.0"
 ipaddress = "^1.0"
 prettytable = "^3.8.0"
+sqlalchemy = "^1.4"
 
 [build-system]
 requires = ["poetry-core"]
