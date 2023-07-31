@@ -241,10 +241,10 @@ class DefaultConfig(object):
     ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
     # time a thread can be reserved in for synchronization purposes. In seconds.
-    RESERVATION_TIMEOUT = 60
+    RESERVATION_TIMEOUT = "60"
 
     # set to True to get real security
-    ALLOW_ONLY_SSL_CONNECTIONS = False
+    ALLOW_ONLY_SSL_CONNECTIONS = "False"
 
     # options for each queue. example:
     #QUEUES_OPTIONS = {

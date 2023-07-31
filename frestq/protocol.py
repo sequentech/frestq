@@ -28,7 +28,7 @@ def certs_differ(cert_a, cert_b):
     if cert_b is None:
         cert_b = u''
 
-    if app.config.get('ALLOW_ONLY_SSL_CONNECTIONS') and\
+    if app.config.get('ALLOW_ONLY_SSL_CONNECTIONS') != "False" and\
             (not len(cert_a) or not len(cert_b)):
         raise SecurityException()
 
@@ -129,7 +129,7 @@ def reserve_task(task_id):
 
     # 4. set reservation timeout
     sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-    date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
+    date = datetime.utcnow() + timedelta(seconds=int(app.config.get('RESERVATION_TIMEOUT')))
     sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
     # 5. wait for a cancel or execute message
@@ -249,7 +249,7 @@ def ack_reservation(task_id):
     # reservation_timeout is also sent
 
     logging.debug("SENDING ACK RESERVATION TO SENDER of task with id %s", task_id)
-    expire_secs = app.config.get('RESERVATION_TIMEOUT')
+    expire_secs = int(app.config.get('RESERVATION_TIMEOUT'))
     task = ModelTask.query.get(task_id)
     msg = {
         "action": "frestq.confirm_task_reservation",
@@ -320,7 +320,10 @@ def synchronize_task(msg):
     # schedule expiration
     if task.expiration_date:
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
-        date = datetime.utcnow() + timedelta(seconds=app.config.get('RESERVATION_TIMEOUT'))
+        date = (
+            datetime.utcnow()
+            + timedelta(seconds=int(app.config.get('RESERVATION_TIMEOUT')))
+        )
         sched.add_date_job(cancel_reserved_subtask, date, [task.id])
 
 
