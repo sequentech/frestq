@@ -698,20 +698,6 @@ pymysql = ["pymysql", "pymysql (<1)"]
 sqlcipher = ["sqlcipher3-binary"]
 
 [[package]]
-name = "sqlalchemy-json"
-version = "0.6.0"
-description = "JSON type with nested change tracking for SQLAlchemy"
-optional = false
-python-versions = ">= 3.6"
-files = [
-    {file = "sqlalchemy-json-0.6.0.tar.gz", hash = "sha256:94785325716f0649ec6f4d0304ce8803a5bf25ff8aa2d998ce6b6334192f7448"},
-    {file = "sqlalchemy_json-0.6.0-py3-none-any.whl", hash = "sha256:06f124c093368903859367c7ab22416c4428e90c09ae14def8391f06a2373c1f"},
-]
-
-[package.dependencies]
-sqlalchemy = ">=0.7"
-
-[[package]]
 name = "tzlocal"
 version = "2.1"
 description = "tzinfo object for the local timezone"
@@ -788,4 +774,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "5c062e16e9b423aa767579e2c13779e550fbc7114c0c059e4f334e34946d6b0e"
+content-hash = "0191646ba7c237dee90d7503b8060c159c7b90d3c3d30f09aba40d6d02bdf046"

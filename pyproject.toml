@@ -21,7 +21,6 @@ pyOpenSSL = "23.2.0"
 ipaddress = "^1.0"
 prettytable = "^3.8.0"
 sqlalchemy = "^1.4"
-sqlalchemy-json = "^0.6.0"
 
 [build-system]
 requires = ["poetry-core"]
