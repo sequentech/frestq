@@ -235,6 +235,10 @@ class DefaultConfig(object):
     SSL_CERT_PATH = None
     SSL_KEY_PATH = None
 
+    # with uwsgi this would be "X-Sender-SSL-Certificate" and in unicorn it's
+    # "HTTP_X_SENDER_SSL_CERTIFICATE"
+    SSL_HEADER_NAME = "X-Sender-SSL-Certificate"
+
     # queues root url
     ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
