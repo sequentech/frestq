@@ -28,8 +28,10 @@ def certs_differ(cert_a, cert_b):
     if cert_b is None:
         cert_b = u''
 
-    if app.config.get('ALLOW_ONLY_SSL_CONNECTIONS') != "False" and\
-            (not len(cert_a) or not len(cert_b)):
+    if app.config.get('ALLOW_ONLY_SSL_CONNECTIONS') == "False":
+        return False
+
+    if (not len(cert_a) or not len(cert_b)):
         raise SecurityException()
 
     if not len(cert_a) and not len(cert_b):
