@@ -20,8 +20,6 @@ from .utils import loads
 
 logging.basicConfig(level=logging.DEBUG)
 
-# boostrap our little application
-db = SQLAlchemy(engine_options={"pool_pre_ping": True})
 
 class FrestqRequest(Request):
     '''
@@ -263,6 +261,9 @@ class DefaultConfig(object):
 
 app = FrestqApp(__name__)
 app.config.from_object(DefaultConfig())
+
+# boostrap our little application
+db = SQLAlchemy(app, engine_options={"pool_pre_ping": True})
 
 from . import models
 
