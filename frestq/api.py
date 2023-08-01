@@ -72,7 +72,8 @@ def post_message(queue_name):
             req['isinstance']):
             return error(400, "invalid/notfound %s parameter" % req['name'])
 
-    sender_ssl_cert = request.environ.get('X-Sender-SSL-Certificate', None)
+    header_name = current_app.config['SSL_HEADER_NAME']
+    sender_ssl_cert = request.environ.get(header_name, None)
     # NOTE: nginx adds \t to the certificate because otherwise it would be not
     # possible to send it as a proxy header, so we have to remove those tabs.
     # A PEM certificate does never contain tabs, so this replace is safe anyway.

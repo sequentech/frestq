@@ -20,6 +20,7 @@ from .utils import loads
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 class FrestqRequest(Request):
     '''
     We have to customize request so that by default it can overload the json
@@ -65,6 +66,7 @@ class FrestqRequest(Request):
 
         return rv
 
+
 class FrestqApp(Flask):
     def __init__(self, *args, **kwargs):
         super(FrestqApp, self).__init__(*args, **kwargs)
@@ -73,35 +75,31 @@ class FrestqApp(Flask):
 
     pargs = None
 
+    def init_db(self):
+        logging.info("initializing db instance..")
+        db.init_app(self)
+
     def configure_app(self, scheduler=True, config_object=None):
         '''
         Configures the application. It's intended to do everything to be able to
-        run the application except calling app.run, so that it can be reused when
-        using gunicorn or similar.
+        run the application except calling app.run, so that it can be reused
+        when using gunicorn or similar.
         '''
-        self.config.from_object(__name__)
         if config_object:
             self.config.from_object(config_object)
 
-        frestq_settings = os.environ.get('FRESTQ_SETTINGS', None)
-        if frestq_settings is not None:
-            if not os.path.isabs(frestq_settings):
-                os.environ['FRESTQ_SETTINGS'] = os.path.abspath(frestq_settings)
-            logging.debug("FRESTQ_SETTINGS = %s" % os.environ['FRESTQ_SETTINGS'])
-            self.config.from_envvar('FRESTQ_SETTINGS', silent=False)
-        else:
-            logging.warning("FRESTQ_SETTINGS not set")
-
         # store cert in
-        if self.config.get('SSL_CERT_PATH', None) and\
-            self.config.get('SSL_KEY_PATH', None):
-
+        if (
+            self.config.get('SSL_CERT_PATH', None) and
+            self.config.get('SSL_KEY_PATH', None)
+        ):
             with open(self.config.get('SSL_CERT_PATH', ''), 'r') as f:
                 self.config['SSL_CERT_STRING'] = f.read()
         else:
             self.config['SSL_CERT_STRING'] = ''
             logging.warning("You are NOT using SSL in this instance")
 
+        self.init_db()
         if not scheduler:
             return
 
@@ -159,11 +157,14 @@ class FrestqApp(Flask):
         if 'parse_args' in kwargs and kwargs['parse_args'] == True:
             del kwargs['parse_args']
             self.parse_args(kwargs.get('extra_parse_func', lambda a,b: None))
+            if 'extra_parse_func' in kwargs:
+                del kwargs['extra_parse_func']
             
         if self.pargs is not None:
             if self.pargs.createdb:
                 print("creating the database: " + self.config.get('SQLALCHEMY_DATABASE_URI', ''))
-                db.create_all()
+                self.init_db()
+                db.create_all(app=self)
                 return
             elif self.pargs.messages:
                 list_messages(self.pargs)
@@ -204,56 +205,65 @@ class FrestqApp(Flask):
         if 'use_reloader' in kwargs:
             print("use_reloader provided but ignored (always set to True): " + kwargs['use_reloader'])
             del kwargs['use_reloader']
+        # ignore extra_run, we used already if needed
+        if 'extra_run' in kwargs:
+            del kwargs['extra_run']
 
         if 'port' not in kwargs:
             kwargs['port'] = app.config.get('SERVER_PORT', None)
 
-        return super(FrestqApp, self).run(threaded=True, use_reloader=False,
-                                          *args, **kwargs)
+        return super(FrestqApp, self)\
+            .run(threaded=True, use_reloader=False, *args, **kwargs)
 
-app = FrestqApp(__name__)
 
 ### configuration
 
-# debug, set to false on production deployment
-DEBUG = True
+class DefaultConfig(object):
+    # debug, set to false on production deployment
+    DEBUG = True
 
-# see https://stackoverflow.com/questions/33738467/how-do-i-know-if-i-can-disable-sqlalchemy-track-modifications/33790196#33790196
-SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # see https://stackoverflow.com/questions/33738467/how-do-i-know-if-i-can-disable-sqlalchemy-track-modifications/33790196#33790196
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-# database configuration
-# example: sqlite:////absolute/path/to/db.sqlite
-SQLALCHEMY_DATABASE_URI = ''
+    # database configuration
+    # example: sqlite:////absolute/path/to/db.sqlite
+    SQLALCHEMY_DATABASE_URI = ''
 
-# own certificate, None if there isn't any
-SSL_CERT_PATH = None
-SSL_KEY_PATH = None
+    # own certificate, None if there isn't any
+    SSL_CERT_PATH = None
+    SSL_KEY_PATH = None
 
-# queues root url
-ROOT_URL = 'http://127.0.0.1:5000/api/queues'
+    # with uwsgi this would be "X-Sender-SSL-Certificate" and in unicorn it's
+    # "HTTP_X_SENDER_SSL_CERTIFICATE"
+    SSL_HEADER_NAME = "X-Sender-SSL-Certificate"
 
-# time a thread can be reserved in for synchronization purposes. In seconds.
-RESERVATION_TIMEOUT = 60
+    # queues root url
+    ROOT_URL = 'http://127.0.0.1:5000/api/queues'
 
-app.config.from_object(__name__)
+    # time a thread can be reserved in for synchronization purposes. In seconds.
+    RESERVATION_TIMEOUT = "60"
+
+    # set to True to get real security
+    ALLOW_ONLY_SSL_CONNECTIONS = "False"
+
+    # options for each queue. example:
+    #QUEUES_OPTIONS = {
+        #'mycustom_queue': {
+            #'max_threads': 3,
+        #}
+    #}
+    # thread data mapper is a function that would be called when a Synchronous task
+    # in this queue is going to be executed. It allows to set queue-specific
+    # settings, and even custom queue settings that can be used by you later.
+
+    QUEUES_OPTIONS = dict()
+
+
+app = FrestqApp(__name__)
+app.config.from_object(DefaultConfig())
 
 # boostrap our little application
 db = SQLAlchemy(app, engine_options={"pool_pre_ping": True})
-
-# set to True to get real security
-ALLOW_ONLY_SSL_CONNECTIONS = False
-
-# options for each queue. example:
-#QUEUES_OPTIONS = {
-    #'mycustom_queue': {
-        #'max_threads': 3,
-    #}
-#}
-# thread data mapper is a function that would be called when a Synchronous task
-# in this queue is going to be executed. It allows to set queue-specific
-# settings, and even custom queue settings that can be used by you later.
-
-QUEUES_OPTIONS = dict()
 
 from . import models
 
