@@ -32,7 +32,7 @@ setup(
         'prettytable==0.7.2',
         'pycparser==2.10',
         'uwsgi==2.0.22',
-        'cryptography==41.0.4',
+        'cryptography==41.0.6',
         'pyOpenSSL==23.2.0',
         'enum34==1.1.6',
         'ipaddress==1.0.22',
