@@ -1322,9 +1322,10 @@ def post_task(msg, action_handler):
         if task.action_handler_object:
             try:
                 task.action_handler_object.handle_error(e)
-            except:
+            except Exception as ee:
                 task.propagate = True
-            print("after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
+                print("FF exception" + ee)
+            print("FF after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
 
     if task_output:
         update_task(task, task_output)
