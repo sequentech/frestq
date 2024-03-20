@@ -1324,7 +1324,8 @@ def post_task(msg, action_handler):
                 task.action_handler_object.handle_error(e)
             except Exception as ee:
                 task.propagate = True
-                print("FF exception" + ee)
+                print("exception arised when handling previous exception")
+                print(ee)
             print("FF after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
 
     if task_output:
