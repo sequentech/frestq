@@ -546,6 +546,7 @@ class SequentialTask(BaseTask):
     def _create_from_model(cls, task_model):
         ret = cls()
         ret.task_model = task_model
+        ret.send_update_to_sender = not task_model.is_local
         ret._init_from_model()
         return ret
 
@@ -1316,7 +1317,6 @@ def post_task(msg, action_handler):
         db.session.commit()
     except Exception as e:
         import traceback; traceback.print_exc()
-        from celery.contrib import rdb; rdb.set_trace()
         task.error = e
         task.propagate = True
         db.session.commit()
@@ -1327,7 +1327,8 @@ def post_task(msg, action_handler):
                 task.propagate = True
                 print("exception arised when handling previous exception")
                 print(ee)
-            print("FF after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
+            print("after error handler task(%s).propagate(%s)" % (task_model.id, task.propagate))
+
 
     if task_output:
         update_task(task, task_output)
@@ -1339,6 +1340,7 @@ def post_task(msg, action_handler):
         db.session.commit()
 
     if task.send_update_to_sender:
+        print("sending update to sender for task(%s)" % (task_model.id))
         sched = FScheduler.get_scheduler(INTERNAL_SCHEDULER_NAME)
         sched.add_now_job(send_task_update, [task_model.id])
 

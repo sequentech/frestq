@@ -22,4 +22,3 @@ cryptography==42.0.2
 pyOpenSSL==24.0.0
 enum34==1.1.6
 ipaddress==1.0.22
-celery==5.2.3
