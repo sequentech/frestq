@@ -1316,6 +1316,7 @@ def post_task(msg, action_handler):
         db.session.commit()
     except Exception as e:
         import traceback; traceback.print_exc()
+        from celery.contrib import rdb; rdb.set_trace()
         task.error = e
         task.propagate = True
         db.session.commit()
