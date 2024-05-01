@@ -54,11 +54,18 @@ def task(action, queue, **kwargs):
         if view_func is not None and not isfunction(view_func):
             view_func.action = action
             view_func.queue_name = queue
+            wrapper_func = view_func
+        else:
+            def wrapper_func(*args, **kwargs):
+                print(f"task: Starting task")
+                ret = view_func(*args, **kwargs)
+                print(f"task: Finished task")
+                return ret
 
-        ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
+        ActionHandlers.add_action_handler(action, queue, wrapper_func, kwargs)
         FScheduler.reserve_scheduler(queue)
 
-        return view_func
+        return wrapper_func
 
     return decorator
 
@@ -91,7 +98,11 @@ class local_task(DecoratorBase):
         local_ssl_cert = app.config['SSL_CERT_STRING']
         if certs_differ(sender_ssl_cert, local_ssl_cert):
             raise SecurityException()
-        return self.func(*args)
+
+        print(f"local_task: Starting task.id={task.task_model.id}")
+        ret = self.func(*args)
+        print(f"local_task: Finished task.id={task.task_model.id}")
+        return ret
 
 def internal_task(name, **kwargs):
     """
