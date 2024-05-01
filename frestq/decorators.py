@@ -54,11 +54,18 @@ def task(action, queue, **kwargs):
         if view_func is not None and not isfunction(view_func):
             view_func.action = action
             view_func.queue_name = queue
+            wrapper_func = view_func
+        else:
+            def wrapper_func(*args, **kwargs):
+                print(f"task: Starting task\n\n")
+                ret = view_func(*args, **kwargs)
+                print(f"task: Finished task\n\n")
+                return ret
 
-        ActionHandlers.add_action_handler(action, queue, view_func, kwargs)
+        ActionHandlers.add_action_handler(action, queue, wrapper_func, kwargs)
         FScheduler.reserve_scheduler(queue)
 
-        return view_func
+        return wrapper_func
 
     return decorator
 

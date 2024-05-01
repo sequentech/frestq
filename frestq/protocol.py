@@ -78,13 +78,26 @@ def update_task(msg):
 
     keys = ['output_data', 'status']
     for key in keys:
-        if key in msg.input_data:
-            if isinstance(msg.input_data[key], str):
-                logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
-                    msg.input_data[key]))
-            else:
-                logging.debug("SETTING TASK FIELD '%s' to: %s" % (key,
-                    dumps(msg.input_data[key])))
+        if key not in msg.input_data:
+            continue
+        str_data = (
+            msg.input_data[key]
+            if isinstance(msg.input_data[key], str)
+            else dumps(msg.input_data[key])
+        )
+        if (
+            key == 'status' and
+            hasattr(task, key) and
+            task.status == 'finished'
+        ):
+            logging.debug(
+                f"({task.id}) **NOT** SETTING TASK FIELD '{key}' to "
+                f"'{str_data}' because it's already 'finished'"
+            )
+        else:
+            logging.debug(
+                "({task.id}) SETTING TASK FIELD '{key}' to '{str_data}'"
+            )
             setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)
