@@ -91,7 +91,11 @@ class local_task(DecoratorBase):
         local_ssl_cert = app.config['SSL_CERT_STRING']
         if certs_differ(sender_ssl_cert, local_ssl_cert):
             raise SecurityException()
-        return self.func(*args)
+
+        print(f"local_task: Starting task.id={task.task_model.id}\n\n")
+        ret = self.func(*args)
+        print(f"local_task: Finished task.id={task.task_model.id}\n\n")
+        return ret
 
 def internal_task(name, **kwargs):
     """
