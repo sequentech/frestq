@@ -57,9 +57,9 @@ def task(action, queue, **kwargs):
             wrapper_func = view_func
         else:
             def wrapper_func(*args, **kwargs):
-                print(f"task: Starting task\n\n")
+                print(f"task: Starting task")
                 ret = view_func(*args, **kwargs)
-                print(f"task: Finished task\n\n")
+                print(f"task: Finished task")
                 return ret
 
         ActionHandlers.add_action_handler(action, queue, wrapper_func, kwargs)
@@ -99,9 +99,9 @@ class local_task(DecoratorBase):
         if certs_differ(sender_ssl_cert, local_ssl_cert):
             raise SecurityException()
 
-        print(f"local_task: Starting task.id={task.task_model.id}\n\n")
+        print(f"local_task: Starting task.id={task.task_model.id}")
         ret = self.func(*args)
-        print(f"local_task: Finished task.id={task.task_model.id}\n\n")
+        print(f"local_task: Finished task.id={task.task_model.id}")
         return ret
 
 def internal_task(name, **kwargs):

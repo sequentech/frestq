@@ -77,6 +77,7 @@ def update_task(msg):
         raise  SecurityException()
 
     keys = ['output_data', 'status']
+
     for key in keys:
         if key not in msg.input_data:
             continue
@@ -94,6 +95,10 @@ def update_task(msg):
                 f"({task.id}) **NOT** SETTING TASK FIELD '{key}' to "
                 f"'{str_data}' because it's already 'finished'"
             )
+            # do next (it might be a task with a parent task)
+            receiver_task = BaseTask.instance_by_model(task)
+            receiver_task.execute()
+            return
         else:
             logging.debug(
                 f"({task.id}) SETTING TASK FIELD '{key}' to '{str_data}'"
