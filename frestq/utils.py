@@ -357,9 +357,9 @@ class DecoratorBase(object):
 
     def __init__(self, func):
         def wrapper_func(*args, **kwargs):
-            print(f"DecoratorBase: Starting task\n\n")
+            print(f"DecoratorBase: Starting task")
             ret = func(*args, **kwargs)
-            print(f"DecoratorBase: Finished task\n\n")
+            print(f"DecoratorBase: Finished task")
             return ret
         self.func = wrapper_func
 
