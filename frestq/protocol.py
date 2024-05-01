@@ -63,7 +63,7 @@ def update_task(msg):
 
     # fixed broken FK bug, when taskid exists in a non local db
     # task = msg.task
-    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).with_for_update().first()
+    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).with_for_update(of=ModelTask).first()
 
     logging.debug("UPDATING TASK with id %s" % task.id)
     if not task or\
