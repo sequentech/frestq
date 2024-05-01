@@ -96,7 +96,7 @@ def update_task(msg):
             )
         else:
             logging.debug(
-                "({task.id}) SETTING TASK FIELD '{key}' to '{str_data}'"
+                f"({task.id}) SETTING TASK FIELD '{key}' to '{str_data}'"
             )
             setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
