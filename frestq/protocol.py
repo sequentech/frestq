@@ -63,7 +63,7 @@ def update_task(msg):
 
     # fixed broken FK bug, when taskid exists in a non local db
     # task = msg.task
-    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).first()
+    task = db.session.query(ModelTask).filter(ModelTask.id == msg.task_id).with_for_update(of=ModelTask).first()
 
     logging.debug("UPDATING TASK with id %s" % task.id)
     if not task or\
@@ -77,14 +77,32 @@ def update_task(msg):
         raise  SecurityException()
 
     keys = ['output_data', 'status']
+
     for key in keys:
-        if key in msg.input_data:
-            if isinstance(msg.input_data[key], str):
-                logging.debug("SETTING TASK FIELD '%s' to '%s'" % (key,
-                    msg.input_data[key]))
-            else:
-                logging.debug("SETTING TASK FIELD '%s' to: %s" % (key,
-                    dumps(msg.input_data[key])))
+        if key not in msg.input_data:
+            continue
+        str_data = (
+            msg.input_data[key]
+            if isinstance(msg.input_data[key], str)
+            else dumps(msg.input_data[key])
+        )
+        if (
+            key == 'status' and
+            hasattr(task, key) and
+            task.status == 'finished'
+        ):
+            logging.debug(
+                f"({task.id}) **NOT** SETTING TASK FIELD '{key}' to "
+                f"'{str_data}' because it's already 'finished'"
+            )
+            # do next (it might be a task with a parent task)
+            receiver_task = BaseTask.instance_by_model(task)
+            receiver_task.execute()
+            return
+        else:
+            logging.debug(
+                f"({task.id}) SETTING TASK FIELD '{key}' to '{str_data}'"
+            )
             setattr(task, key, msg.input_data[key])
     task.last_modified_date = datetime.utcnow()
     db.session.add(task)

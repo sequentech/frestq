@@ -157,7 +157,7 @@ def traverse_tasktree(task, visitor_func, visitor_kwargs):
 def show_task(args):
     from .app import db
     from .models import Task
-    task_id = unicode(args.show_task)
+    task_id = str(args.show_task)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
         print("task %s not found" % task_id)
@@ -260,7 +260,7 @@ def show_activity(args):
 def show_message(args):
     from .app import db
     from .models import Message
-    msg_id = unicode(args.show_message)
+    msg_id = str(args.show_message)
     msg_model = db.session.query(Message).filter(Message.id.startswith(msg_id)).all()
     if not msg_model:
         print("message %s not found" % msg_id)
@@ -273,7 +273,7 @@ def get_external_task(args):
     from .app import db
     from .models import Task
 
-    task_id = unicode(args.show_external)
+    task_id = str(args.show_external)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
 
     return task_model
@@ -281,7 +281,7 @@ def get_external_task(args):
 # drb
 def show_external_task(args):
 
-    task_id = unicode(args.show_external)
+    task_id = str(args.show_external)
     task_model = get_external_task(args)
 
     if not task_model:
@@ -302,9 +302,9 @@ def finish_task(args):
     from .models import Task
     from .tasks import ExternalTask
 
-    task_id = unicode(args.finish[0])
+    task_id = str(args.finish[0])
     try:
-        finish_data = loads(unicode(args.finish[1]))
+        finish_data = loads(str(args.finish[1]))
     except:
         print("error loading the json finish data")
         return
@@ -331,7 +331,7 @@ def deny_task(args):
 def task_tree(args):
     from .app import db
     from .models import Task
-    task_id = unicode(args.tree)
+    task_id = str(args.tree)
     task_model = db.session.query(Task).filter(Task.id.startswith(task_id)).all()
     if not task_model:
         print("task %s not found" % task_id)
@@ -356,7 +356,12 @@ class DecoratorBase(object):
     func = None
 
     def __init__(self, func):
-        self.func = func
+        def wrapper_func(*args, **kwargs):
+            print(f"DecoratorBase: Starting task")
+            ret = func(*args, **kwargs)
+            print(f"DecoratorBase: Finished task")
+            return ret
+        self.func = wrapper_func
 
     def __getattribute__(self, name):
         if name == "func":
