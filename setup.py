@@ -20,7 +20,7 @@ setup(
         'requests==2.31.0',
         'Flask==2.3.2',
         'Flask-SQLAlchemy==2.5.1',
-        'Jinja2==3.1.3',
+        'Jinja2==3.1.4',
         'MarkupSafe==2.1.1',
         'SQLAlchemy==1.3.23',
         'Werkzeug==2.3.8',
