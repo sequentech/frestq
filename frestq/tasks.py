@@ -323,12 +323,13 @@ class SimpleTask(BaseTask):
     info_text = None
     expiration_date = None
     pingback_date = None
+    scheduled_date = None
 
     auto_finish_after_handler = True
 
     def __init__(self, receiver_url, action, queue, data=None, label=None,
             info_text=None, pingback_date=None, expiration_date=None,
-            receiver_ssl_cert=None):
+            receiver_ssl_cert=None, scheduled_date=None):
         '''
         Constructor of a simple tasks. It takes as input all the information
         needed to send the single task to the receiver end.
@@ -346,6 +347,7 @@ class SimpleTask(BaseTask):
         self.expiration_date = expiration_date
         self.pingback_date = pingback_date
         self.receiver_ssl_cert = receiver_ssl_cert
+        self.scheduled_date = scheduled_date
 
     @classmethod
     def _create_from_model(cls, task_model):
@@ -356,7 +358,8 @@ class SimpleTask(BaseTask):
             data=task_model.input_data,
             pingback_date=task_model.pingback_date,
             expiration_date=task_model.expiration_date,
-            label=task_model.label
+            label=task_model.label,
+            scheduled_date=task_model.scheduled_date
        )
         ret.task_model = task_model
         # local task do not need updates
@@ -386,6 +389,7 @@ class SimpleTask(BaseTask):
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
+            'scheduled_date': self.scheduled_date,
             'info_text': self.info_text,
             'id': task_id,
             'status': 'created',
@@ -480,6 +484,7 @@ class ExternalTask(SimpleTask):
             'input_data': self.data,
             'pingback_date': self.pingback_date,
             'expiration_date': self.expiration_date,
+            'scheduled_date': self.scheduled_date,
             'id': task_id,
             'status': 'created',
             'task_type': 'external',
@@ -594,6 +599,7 @@ class SequentialTask(BaseTask):
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
+            'scheduled_date': None,
             'id': task_id,
             'status': 'created',
             'task_type': 'sequential',
@@ -757,6 +763,7 @@ class ParallelTask(BaseTask):
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
+            'scheduled_date': None,
             'info_text': None,
             'id': task_id,
             'status': 'created',
@@ -890,7 +897,8 @@ def send_synchronization_message(task_id):
             'queue_name': task.queue_name,
             'pingback_date': task.pingback_date,
             'input_data': task.input_data,
-            'expiration_date': task.expiration_date
+            'expiration_date': task.expiration_date,
+            'scheduled_date': task.scheduled_date
         },
         "task_id": task.id
     }
@@ -980,6 +988,7 @@ class SynchronizedTask(BaseTask):
             'input_data': dict(),
             'pingback_date': None,
             'expiration_date': None,
+            'scheduled_date': None,
             'info_text': None,
             'id': task_id,
             'status': 'created',
@@ -1112,6 +1121,7 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
     * task_id
     * pingback_date
     * expiration_date
+    * scheduled_date
     * info
     '''
 
@@ -1131,7 +1141,7 @@ def send_message(msg_data, update_task_receiver_ssl_cert=False, task=None):
         'sender_url': msg.sender_url,
         "data": msg_data.get('input_data', '')
     }
-    opts = ['async_data', 'task_id', 'pingback_date', 'expiration_date', 'info']
+    opts = ['async_data', 'task_id', 'pingback_date', 'expiration_date', 'info', 'scheduled_date']
     for opt in opts:
         if opt in msg_data and msg_data[opt] != None:
             payload[opt] = msg_data[opt]
@@ -1283,6 +1293,7 @@ def post_task(msg, action_handler):
         'input_data': msg.input_data,
         'pingback_date': msg.pingback_date,
         'expiration_date': msg.expiration_date,
+        'scheduled_date': msg.scheduled_date,
         'status': 'executing',
         'info_text': msg.info_text,
         'id': msg.task_id,
