@@ -105,6 +105,7 @@ def post_message(queue_name):
                 'input_data': data.get('data', None),
                 'pingback_date': data.get('pingback_date', None),
                 'expiration_date': data.get('expiration_date', None),
+                'scheduled_date': data.get('scheduled_date', None),
                 'info_text': data.get('info_text', None),
                 'task_id': data.get('task_id', None),
                 'output_status': 200
@@ -123,7 +124,12 @@ def post_message(queue_name):
     # 3. call to action handle
     from .fscheduler import FScheduler
     sched = FScheduler.get_scheduler(queue_name)
-    sched.add_now_job(call_action_handler, [msg.id, queue_name])
+    
+    scheduled_date = data.get('scheduled_date', None)
+    if scheduled_date:
+        sched.add_date_job(call_action_handler, scheduled_date, [msg.id, queue_name])
+    else:
+        sched.add_now_job(call_action_handler, [msg.id, queue_name])
 
     # 4. return output message
     return make_response("", msg.output_status)
